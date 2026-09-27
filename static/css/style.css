@@ -1,0 +1,838 @@
+/* ==========================================================================
+   O REFÚGIO - DESIGN SYSTEM (NEO-BRUTALISM & RETRÔ 16-BITS)
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;800&family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg-deep: #0a0e17;
+  --bg-surface: #111625;
+  --bg-card: #141c30;
+  --bg-card-hover: #1a243d;
+  --border-green: #00ff66;
+  --border-amber: #ffb000;
+  --border-cyan: #00f0ff;
+  --border-pink: #ff0055;
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --shadow-color: #000000;
+  --font-mono: 'JetBrains Mono', 'Share Tech Mono', monospace;
+  --font-pixel: 'Press Start 2P', monospace;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --brutalist-border-w: 2px;
+  --shadow-offset: 4px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-deep);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Scanline retrô sutil no topo do body */
+body::before {
+  content: " ";
+  display: block;
+  position: fixed;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+  z-index: 999;
+  background-size: 100% 3px, 3px 100%;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Links */
+a {
+  color: var(--border-cyan);
+  text-decoration: none;
+  transition: all 0.15s ease-in-out;
+}
+
+a:hover {
+  color: var(--border-green);
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   TOP TERMINAL TICKER
+   ========================================================================== */
+.terminal-ticker {
+  background: #000000;
+  border-bottom: 2px solid var(--border-green);
+  color: var(--border-green);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 6px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  letter-spacing: 0.5px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticker-item .dot {
+  width: 8px;
+  height: 8px;
+  background: var(--border-green);
+  display: inline-block;
+  animation: pulse-green 1.5s infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* ==========================================================================
+   HEADER & NAVBAR
+   ========================================================================== */
+.site-header {
+  background: var(--bg-surface);
+  border-bottom: 3px solid var(--border-amber);
+  padding: 20px 0;
+  box-shadow: 0 4px 0 #000000;
+}
+
+.container {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.logo-block {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.logo-badge {
+  background: #000000;
+  border: 2px solid var(--border-green);
+  color: var(--border-green);
+  font-family: var(--font-pixel);
+  font-size: 0.9rem;
+  padding: 10px 14px;
+  box-shadow: 3px 3px 0 var(--border-green);
+  text-shadow: 0 0 5px rgba(0, 255, 102, 0.4);
+}
+
+.logo-text h1 {
+  font-family: var(--font-mono);
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-text h1 span {
+  color: var(--border-amber);
+}
+
+.logo-text p {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.main-nav {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.nav-btn {
+  background: #000000;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border: 2px solid #ffffff;
+  box-shadow: 3px 3px 0 #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.nav-btn:hover {
+  text-decoration: none;
+  background: var(--bg-surface);
+  border-color: var(--border-cyan);
+  color: var(--border-cyan);
+  box-shadow: 3px 3px 0 var(--border-cyan);
+}
+
+.nav-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--border-cyan);
+}
+
+.nav-btn.active {
+  border-color: var(--border-green);
+  color: var(--border-green);
+  box-shadow: 3px 3px 0 var(--border-green);
+}
+
+.nav-btn.admin-btn {
+  border-color: var(--border-amber);
+  color: var(--border-amber);
+  box-shadow: 3px 3px 0 var(--border-amber);
+}
+
+/* ==========================================================================
+   MAIN LAYOUT & CARDS (NEO-BRUTALIST)
+   ========================================================================== */
+main {
+  flex: 1;
+  padding: 40px 0;
+}
+
+.flash-banner {
+  background: #000000;
+  border: 2px solid var(--border-green);
+  color: var(--border-green);
+  font-family: var(--font-mono);
+  padding: 12px 16px;
+  margin-bottom: 30px;
+  box-shadow: 4px 4px 0 var(--border-green);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-brutalist {
+  background: var(--bg-card);
+  border: 2px solid #334155;
+  box-shadow: 5px 5px 0 #000000;
+  padding: 24px;
+  margin-bottom: 30px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  position: relative;
+}
+
+.card-brutalist:hover {
+  border-color: var(--border-green);
+  box-shadow: 6px 6px 0 var(--border-green);
+}
+
+.card-title {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.card-title a {
+  color: #ffffff;
+}
+
+.card-title a:hover {
+  color: var(--border-cyan);
+}
+
+.badge-cat {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  background: #000000;
+  border: 1px solid var(--border-amber);
+  color: var(--border-amber);
+  box-shadow: 2px 2px 0 var(--border-amber);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.card-meta {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.card-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.post-media-cover {
+  width: 100%;
+  max-height: 380px;
+  object-fit: cover;
+  border: 2px solid #000000;
+  margin-bottom: 20px;
+  display: block;
+}
+
+/* ==========================================================================
+   BUTTONS (PHYSICAL TACTILE FEEL)
+   ========================================================================== */
+.btn {
+  background: #000000;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 10px 18px;
+  border: 2px solid var(--border-green);
+  box-shadow: 4px 4px 0 var(--border-green);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.06s ease, box-shadow 0.06s ease;
+  text-transform: uppercase;
+}
+
+.btn:hover {
+  background: var(--border-green);
+  color: #000000;
+  text-decoration: none;
+}
+
+.btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 var(--border-green);
+}
+
+.btn-amber {
+  border-color: var(--border-amber);
+  box-shadow: 4px 4px 0 var(--border-amber);
+  color: var(--border-amber);
+}
+
+.btn-amber:hover {
+  background: var(--border-amber);
+  color: #000000;
+}
+
+.btn-amber:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 var(--border-amber);
+}
+
+.btn-cyan {
+  border-color: var(--border-cyan);
+  box-shadow: 4px 4px 0 var(--border-cyan);
+  color: var(--border-cyan);
+}
+
+.btn-cyan:hover {
+  background: var(--border-cyan);
+  color: #000000;
+}
+
+.btn-cyan:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 var(--border-cyan);
+}
+
+.btn-danger {
+  border-color: var(--border-pink);
+  box-shadow: 4px 4px 0 var(--border-pink);
+  color: var(--border-pink);
+}
+
+.btn-danger:hover {
+  background: var(--border-pink);
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   CATEGORIES PILLS & PAGINATION
+   ========================================================================== */
+.category-filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 30px;
+}
+
+.filter-pill {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  background: #000000;
+  border: 1px solid #475569;
+  color: var(--text-muted);
+}
+
+.filter-pill:hover,
+.filter-pill.active {
+  border-color: var(--border-green);
+  color: var(--border-green);
+  background: #0f172a;
+  text-decoration: none;
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 40px;
+  font-family: var(--font-mono);
+}
+
+/* ==========================================================================
+   LAB / COMMUNITY HUB & TOP 5 PODIUM
+   ========================================================================== */
+.lab-header {
+  border: 2px solid var(--border-cyan);
+  box-shadow: 5px 5px 0 var(--border-cyan);
+  background: #000000;
+  padding: 24px;
+  margin-bottom: 35px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.top5-container {
+  margin-bottom: 40px;
+}
+
+.section-label {
+  font-family: var(--font-pixel);
+  font-size: 0.85rem;
+  color: var(--border-amber);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.top5-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.top5-card {
+  background: #0d1322;
+  border: 2px solid var(--border-amber);
+  box-shadow: 4px 4px 0 var(--border-amber);
+  padding: 18px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.top5-rank-badge {
+  position: absolute;
+  top: -12px;
+  right: 14px;
+  background: #000000;
+  border: 2px solid var(--border-amber);
+  color: var(--border-amber);
+  font-family: var(--font-pixel);
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  box-shadow: 2px 2px 0 #000;
+}
+
+.submissions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.submission-card {
+  background: var(--bg-card);
+  border: 2px solid #334155;
+  box-shadow: 4px 4px 0 #000000;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.submission-card:hover {
+  border-color: var(--border-cyan);
+  box-shadow: 5px 5px 0 var(--border-cyan);
+}
+
+.submission-card .clicks-info {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--border-green);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==========================================================================
+   POST DETAIL & COMMENTS
+   ========================================================================== */
+.post-content {
+  font-size: 1.05rem;
+  line-height: 1.8;
+  color: #cbd5e1;
+}
+
+.post-content h1, .post-content h2, .post-content h3 {
+  font-family: var(--font-mono);
+  color: #ffffff;
+  margin: 28px 0 16px 0;
+  letter-spacing: -0.5px;
+}
+
+.post-content h1 { font-size: 1.8rem; border-bottom: 2px dashed #334155; padding-bottom: 8px; }
+.post-content h2 { font-size: 1.4rem; color: var(--border-amber); }
+.post-content h3 { font-size: 1.2rem; color: var(--border-cyan); }
+
+.post-content p {
+  margin-bottom: 18px;
+}
+
+.post-content blockquote {
+  border-left: 4px solid var(--border-green);
+  background: #000000;
+  padding: 12px 18px;
+  margin: 20px 0;
+  font-family: var(--font-mono);
+  color: #86efac;
+}
+
+.post-content pre {
+  background: #000000;
+  border: 1px solid #334155;
+  padding: 14px;
+  overflow-x: auto;
+  margin: 20px 0;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.post-content code {
+  font-family: var(--font-mono);
+  background: #000000;
+  padding: 2px 6px;
+  color: var(--border-cyan);
+  border: 1px solid #334155;
+}
+
+.comments-section {
+  margin-top: 50px;
+  border-top: 2px solid #334155;
+  padding-top: 40px;
+}
+
+.comment-card {
+  background: #0d121f;
+  border: 1px solid #334155;
+  box-shadow: 3px 3px 0 #000;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.comment-author {
+  color: var(--border-amber);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   FORMS & INPUTS (RETRO BRUTALIST)
+   ========================================================================== */
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #cbd5e1;
+}
+
+.form-input, .form-textarea, .form-select {
+  width: 100%;
+  background: #000000;
+  border: 2px solid #475569;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  padding: 10px 12px;
+  box-shadow: 3px 3px 0 #000000;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  border-color: var(--border-green);
+  box-shadow: 3px 3px 0 var(--border-green);
+}
+
+.form-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+/* Campo Honeypot invisível para bots */
+.hp-field {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+
+/* ==========================================================================
+   MODAL 16-BITS RETRO
+   ========================================================================== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(3px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-window {
+  background: var(--bg-surface);
+  border: 3px solid var(--border-cyan);
+  box-shadow: 8px 8px 0 #000000;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-titlebar {
+  background: #000000;
+  border-bottom: 2px solid var(--border-cyan);
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-pixel);
+  font-size: 0.75rem;
+  color: var(--border-cyan);
+}
+
+.modal-close-btn {
+  background: #ff0055;
+  color: #ffffff;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+/* ==========================================================================
+   ADMIN DASHBOARD
+   ========================================================================== */
+.admin-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.metric-card {
+  background: #000000;
+  border: 2px solid var(--border-green);
+  box-shadow: 4px 4px 0 var(--border-green);
+  padding: 16px;
+  text-align: center;
+}
+
+.metric-val {
+  font-family: var(--font-pixel);
+  font-size: 1.5rem;
+  color: var(--border-green);
+  margin-bottom: 6px;
+}
+
+.metric-lbl {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid #334155;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  background: #000000;
+  color: var(--text-muted);
+  border: 2px solid #334155;
+  border-bottom: none;
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  border-color: var(--border-amber);
+  color: var(--border-amber);
+  background: var(--bg-surface);
+}
+
+.table-brutalist {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+}
+
+.table-brutalist th, .table-brutalist td {
+  border: 1px solid #334155;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.table-brutalist th {
+  background: #000000;
+  color: var(--border-amber);
+}
+
+.table-brutalist tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ==========================================================================
+   FOOTER & RETRO VISITOR ODOMETER
+   ========================================================================== */
+.site-footer {
+  background: #000000;
+  border-top: 3px solid var(--border-green);
+  padding: 30px 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.odometer-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid var(--border-green);
+  padding: 6px 12px;
+  background: #0a0e17;
+  box-shadow: 3px 3px 0 var(--border-green);
+}
+
+.odometer-label {
+  font-size: 0.75rem;
+  color: var(--border-green);
+  font-weight: 700;
+}
+
+.odometer-digits {
+  display: flex;
+  gap: 3px;
+}
+
+.odometer-digit {
+  background: #000000;
+  border: 1px solid var(--border-green);
+  color: var(--border-green);
+  font-family: var(--font-pixel);
+  font-size: 0.85rem;
+  padding: 3px 6px;
+  box-shadow: inset 0 0 4px rgba(0, 255, 102, 0.4);
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .main-nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .footer-content {
+    flex-direction: column;
+    text-align: center;
+  }
+}

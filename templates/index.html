@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Diário de Bordo // O Refúgio{% endblock %}
+
+{% block content %}
+  <!-- Category Bar -->
+  <div class="category-filter-bar">
+    <a href="/" class="filter-pill {% if not current_category %}active{% endif %}">
+      [TODAS AS ENTRADAS]
+    </a>
+    {% for cat in categories %}
+      <a href="/?category={{ cat|urlencode }}" class="filter-pill {% if current_category == cat %}active{% endif %}">
+        [{{ cat | upper }}]
+      </a>
+    {% endfor %}
+  </div>
+
+  <!-- Timeline Posts Feed -->
+  <section class="posts-feed">
+    {% if posts %}
+      {% for post in posts %}
+        <article class="card-brutalist">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+            <span class="badge-cat">{{ post.category }}</span>
+            <div class="card-meta" style="margin-bottom: 0;">
+              <span>[DATA: {{ post.created_at|format_datetime }}]</span>
+              <span>[VIEWS: {{ post.views_count }}]</span>
+              <span>[COMMENTS: {{ post.comments|length }}]</span>
+            </div>
+          </div>
+
+          <h2 class="card-title" style="margin-top: 10px;">
+            <a href="/post/{{ post.slug }}">{{ post.title }}</a>
+          </h2>
+
+          {% if post.media_url %}
+            <a href="/post/{{ post.slug }}">
+              <img src="{{ post.media_url }}" alt="{{ post.title }}" class="post-media-cover" loading="lazy">
+            </a>
+          {% endif %}
+
+          <div style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">
+            {{ post.content[:240] }}...
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <a href="/post/{{ post.slug }}" class="btn">
+              LER POST COMPLETO &gt;&gt;
+            </a>
+            <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim);">
+              // SLUG: /{{ post.slug }}
+            </span>
+          </div>
+        </article>
+      {% endfor %}
+    {% else %}
+      <div class="card-brutalist" style="text-align: center; padding: 50px 20px;">
+        <h3 style="font-family: var(--font-mono); color: var(--border-amber); margin-bottom: 12px;">[TERMINAL SILENCIOSO]</h3>
+        <p style="color: var(--text-muted);">Nenhuma entrada encontrada para este filtro.</p>
+        <a href="/" class="btn" style="margin-top: 20px;">LIMPAR FILTROS</a>
+      </div>
+    {% endif %}
+  </section>
+
+  <!-- Pagination Controls -->
+  {% if total_pages > 1 %}
+    <nav class="pagination-controls" aria-label="Navegação da Timeline">
+      {% if page > 1 %}
+        <a href="/?page={{ page - 1 }}{% if current_category %}&category={{ current_category|urlencode }}{% endif %}" class="btn">
+          &lt;&lt; ANTERIOR
+        </a>
+      {% endif %}
+
+      <span style="padding: 10px 16px; border: 2px solid #334155; background: #000; font-weight: bold;">
+        [PÁGINA {{ page }} DE {{ total_pages }}]
+      </span>
+
+      {% if page < total_pages %}
+        <a href="/?page={{ page + 1 }}{% if current_category %}&category={{ current_category|urlencode }}{% endif %}" class="btn">
+          PRÓXIMA &gt;&gt;
+        </a>
+      {% endif %}
+    </nav>
+  {% endif %}
+{% endblock %}

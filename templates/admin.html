@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Painel de Operações // O Refúgio{% endblock %}
+
+{% block content %}
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;">
+    <div>
+      <h1 style="font-family: var(--font-pixel); font-size: 1.3rem; color: var(--border-amber);">
+        [SYS: PAINEL DE CONTROLE]
+      </h1>
+      <p style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-dim);">
+        Operador logado: <strong>{{ admin_user.username }}</strong>
+      </p>
+    </div>
+    <div>
+      <a href="/logout" class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem;">
+        ENCERRAR SESSÃO
+      </a>
+    </div>
+  </div>
+
+  <!-- Metrics Grid -->
+  <div class="admin-metrics-grid">
+    <div class="metric-card">
+      <div class="metric-val">{{ stats.total_posts }}</div>
+      <div class="metric-lbl">Posts Publicados</div>
+    </div>
+    <div class="metric-card" style="border-color: var(--border-cyan);">
+      <div class="metric-val" style="color: var(--border-cyan);">{{ stats.total_views }}</div>
+      <div class="metric-lbl">Views em Posts</div>
+    </div>
+    <div class="metric-card" style="border-color: var(--border-amber);">
+      <div class="metric-val" style="color: var(--border-amber);">{{ stats.pending_submissions }}</div>
+      <div class="metric-lbl">Submissões Pendentes</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val">{{ stats.approved_submissions }}</div>
+      <div class="metric-lbl">Projetos Aprovados</div>
+    </div>
+    <div class="metric-card" style="border-color: var(--border-pink);">
+      <div class="metric-val" style="color: var(--border-pink);">{{ stats.total_comments }}</div>
+      <div class="metric-lbl">Comentários</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-val">{{ stats.total_visits }}</div>
+      <div class="metric-lbl">Visitas Globais</div>
+    </div>
+  </div>
+
+  <!-- Admin Navigation Tabs -->
+  <div class="admin-tabs">
+    <button type="button" class="tab-btn {% if active_tab == 'posts' %}active{% endif %}" data-tab="posts">
+      [01. POSTS ({{ posts|length }})]
+    </button>
+    <button type="button" class="tab-btn {% if active_tab == 'new_post' %}active{% endif %}" data-tab="new_post">
+      [+ NOVO POST]
+    </button>
+    <button type="button" class="tab-btn {% if active_tab == 'submissions' %}active{% endif %}" data-tab="submissions">
+      [02. MODERAÇÃO LAB ({{ pending_submissions|length }} PENDENTES)]
+    </button>
+    <button type="button" class="tab-btn {% if active_tab == 'comments' %}active{% endif %}" data-tab="comments">
+      [03. COMENTÁRIOS ({{ comments|length }})]
+    </button>
+  </div>
+
+  <!-- TAB 1: POSTS LIST -->
+  <div class="tab-pane" id="tab-posts" style="display: {% if active_tab == 'posts' %}block{% else %}none{% endif %};">
+    <div class="card-brutalist">
+      <h3 style="font-family: var(--font-mono); color: var(--border-green); margin-bottom: 20px;">
+        LISTAGEM DE POSTS DO DIÁRIO
+      </h3>
+
+      <div style="overflow-x: auto;">
+        <table class="table-brutalist">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Título</th>
+              <th>Categoria</th>
+              <th>Views</th>
+              <th>Comentários</th>
+              <th>Data</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for post in posts %}
+              <tr>
+                <td>#{{ post.id }}</td>
+                <td>
+                  <a href="/post/{{ post.slug }}" target="_blank" style="color: #ffffff; font-weight: bold;">
+                    {{ post.title }}
+                  </a>
+                </td>
+                <td><span class="badge-cat" style="margin: 0;">{{ post.category }}</span></td>
+                <td>{{ post.views_count }}</td>
+                <td>{{ post.comments|length }}</td>
+                <td>{{ post.created_at|format_datetime }}</td>
+                <td style="white-space: nowrap;">
+                  <a href="/admin/posts/{{ post.id }}/edit" class="btn btn-amber" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 4px;">
+                    EDITAR
+                  </a>
+                  <form action="/admin/posts/{{ post.id }}/delete" method="POST" style="display: inline;" onsubmit="return confirm('Deseja realmente excluir este post?');">
+                    <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">
+                      EXCLUIR
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: NEW POST FORM -->
+  <div class="tab-pane" id="tab-new_post" style="display: {% if active_tab == 'new_post' %}block{% else %}none{% endif %};">
+    <div class="card-brutalist" style="border-color: var(--border-green);">
+      <h3 style="font-family: var(--font-mono); color: var(--border-green); margin-bottom: 20px;">
+        PUBLICAR NOVA ENTRADA NO DIÁRIO DE BORDO
+      </h3>
+
+      <form action="/admin/posts/new" method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+          <label class="form-label" for="title">Título do Post *</label>
+          <input type="text" id="title" name="title" class="form-input" placeholder="Ex: Crônica dos 28 anos: Silêncio e Café..." required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+          <div class="form-group">
+            <label class="form-label" for="category">Categoria *</label>
+            <input type="text" id="category" name="category" class="form-input" placeholder="Ex: Saga dos 28, Mangás &amp; Cultura, Dev &amp; Tech" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="media_url">URL da Capa (Opcional)</label>
+            <input type="url" id="media_url" name="media_url" class="form-input" placeholder="https://images.unsplash.com/...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="media_file">Ou Upload Local de Imagem (PNG, JPG, WEBP - max 5MB)</label>
+          <input type="file" id="media_file" name="media_file" class="form-input" accept="image/*">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="content">Conteúdo (Suporta Markdown Completo e HTML Rico) *</label>
+          <textarea id="content" name="content" class="form-textarea" style="min-height: 250px;" placeholder="# Escreva seu texto aqui..." required></textarea>
+        </div>
+
+        <button type="submit" class="btn">
+          PUBLICAR NO DIÁRIO &gt;&gt;
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- TAB 3: MODERAÇÃO DO LAB -->
+  <div class="tab-pane" id="tab-submissions" style="display: {% if active_tab == 'submissions' %}block{% else %}none{% endif %};">
+    <!-- Pendentes -->
+    <div class="card-brutalist" style="border-color: var(--border-amber); margin-bottom: 30px;">
+      <h3 style="font-family: var(--font-mono); color: var(--border-amber); margin-bottom: 16px;">
+        SUBMISSÕES AGUARDANDO MODERAÇÃO ({{ pending_submissions|length }})
+      </h3>
+
+      {% if pending_submissions %}
+        <div style="overflow-x: auto;">
+          <table class="table-brutalist">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Autor</th>
+                <th>Título</th>
+                <th>Categoria</th>
+                <th>Repositório</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for sub in pending_submissions %}
+                <tr>
+                  <td>{{ sub.created_at|format_datetime }}</td>
+                  <td><strong>{{ sub.author_name }}</strong><br><small style="color:var(--text-dim);">{{ sub.author_email }}</small></td>
+                  <td>
+                    <strong>{{ sub.title }}</strong>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">{{ sub.description }}</p>
+                  </td>
+                  <td><span class="badge-cat" style="margin: 0;">{{ sub.category }}</span></td>
+                  <td>
+                    <a href="{{ sub.github_link }}" target="_blank" rel="noopener noreferrer">[VER REPO]</a>
+                  </td>
+                  <td style="white-space: nowrap;">
+                    <form action="/admin/submissions/{{ sub.id }}/status" method="POST" style="display: inline;">
+                      <input type="hidden" name="status_value" value="approved">
+                      <button type="submit" class="btn" style="padding: 4px 8px; font-size: 0.75rem;">APROVAR</button>
+                    </form>
+
+                    <form action="/admin/submissions/{{ sub.id }}/status" method="POST" style="display: inline; margin-left: 4px;">
+                      <input type="hidden" name="status_value" value="rejected">
+                      <button type="submit" class="btn btn-amber" style="padding: 4px 8px; font-size: 0.75rem;">REJEITAR</button>
+                    </form>
+
+                    <form action="/admin/submissions/{{ sub.id }}/delete" method="POST" style="display: inline; margin-left: 4px;" onsubmit="return confirm('Excluir submissão definitivamente?');">
+                      <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">DEL</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p style="color: var(--text-muted); font-family: var(--font-mono);">
+          Zero submissões pendentes. Tudo em ordem por aqui!
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- Já Aprovados -->
+    <div class="card-brutalist">
+      <h3 style="font-family: var(--font-mono); color: var(--border-green); margin-bottom: 16px;">
+        PROJETOS APROVADOS ATIVOS NO LAB ({{ approved_submissions|length }})
+      </h3>
+
+      <div style="overflow-x: auto;">
+        <table class="table-brutalist">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Título</th>
+              <th>Autor</th>
+              <th>Categoria</th>
+              <th>Cliques</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sub in approved_submissions %}
+              <tr>
+                <td>#{{ sub.id }}</td>
+                <td><strong>{{ sub.title }}</strong></td>
+                <td>{{ sub.author_name }}</td>
+                <td><span class="badge-cat" style="margin: 0;">{{ sub.category }}</span></td>
+                <td><span style="color: var(--border-green); font-weight: bold;">⚡ {{ sub.clicks_count }}</span></td>
+                <td>
+                  <form action="/admin/submissions/{{ sub.id }}/delete" method="POST" style="display: inline;" onsubmit="return confirm('Remover este projeto aprovado?');">
+                    <button type="submit" class="btn btn-danger" style="padding: 3px 6px; font-size: 0.7rem;">REMOVER</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: COMENTÁRIOS -->
+  <div class="tab-pane" id="tab-comments" style="display: {% if active_tab == 'comments' %}block{% else %}none{% endif %};">
+    <div class="card-brutalist">
+      <h3 style="font-family: var(--font-mono); color: var(--border-pink); margin-bottom: 20px;">
+        MODERAÇÃO DE COMENTÁRIOS RECENTES
+      </h3>
+
+      {% if comments %}
+        <div style="overflow-x: auto;">
+          <table class="table-brutalist">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Autor</th>
+                <th>Post</th>
+                <th>Comentário</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for comment in comments %}
+                <tr>
+                  <td>{{ comment.created_at|format_datetime }}</td>
+                  <td><strong>{{ comment.author_name }}</strong><br><small style="color:var(--text-dim);">{{ comment.author_email }}</small></td>
+                  <td>
+                    <a href="/post/{{ comment.post.slug }}" target="_blank">
+                      {{ comment.post.title[:30] }}...
+                    </a>
+                  </td>
+                  <td>{{ comment.content }}</td>
+                  <td>
+                    <form action="/admin/comments/{{ comment.id }}/delete" method="POST" style="display: inline;" onsubmit="return confirm('Remover este comentário?');">
+                      <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">EXCLUIR</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p style="color: var(--text-muted); font-family: var(--font-mono);">
+          Nenhum comentário cadastrado ainda.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

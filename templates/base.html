@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}O Refúgio - Indie Blog & Community Hub{% endblock %}</title>
+  
+  <meta name="description" content="Espaço autoral, diário de bordo e laboratório open-source independente da era dos algoritmos.">
+  <link rel="alternate" type="application/rss+xml" title="Feed RSS de O Refúgio" href="/rss">
+  
+  <link rel="stylesheet" href="/static/css/style.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Top Terminal Status Ticker -->
+  <div class="terminal-ticker">
+    <div class="ticker-item">
+      <span class="dot"></span>
+      <span>[SYS: ONLINE]</span>
+    </div>
+    <div class="ticker-item">
+      <span>[NODE: REFUGIO-01]</span>
+    </div>
+    <div class="ticker-item">
+      <span>[PROTOCOL: INDIEWEB 1.0]</span>
+    </div>
+    <div class="ticker-item">
+      <span id="ticker-clock">[TIME: --:--:-- UTC]</span>
+    </div>
+    <div class="ticker-item">
+      <span>[UPTIME: 99.98%]</span>
+    </div>
+  </div>
+
+  <!-- Header & Navigation -->
+  <header class="site-header">
+    <div class="container header-content">
+      <div class="logo-block">
+        <a href="/" class="logo-badge" title="Retornar ao início">[//R]</a>
+        <div class="logo-text">
+          <h1><a href="/">O REFÚGIO<span>_</span></a></h1>
+          <p>Indie Blog &amp; Laboratório Comunitário // Saga dos 28</p>
+        </div>
+      </div>
+
+      <nav class="main-nav">
+        <a href="/" class="nav-btn {% if request.url.path == '/' %}active{% endif %}">
+          [01. DIÁRIO]
+        </a>
+        <a href="/lab" class="nav-btn {% if '/lab' in request.url.path %}active{% endif %}">
+          [02. LABORATÓRIO]
+        </a>
+        <a href="/about" class="nav-btn {% if '/about' in request.url.path %}active{% endif %}">
+          [03. O MANIFESTO]
+        </a>
+        {% if current_user %}
+          <a href="/admin" class="nav-btn admin-btn {% if '/admin' in request.url.path %}active{% endif %}">
+            [04. ADMIN]
+          </a>
+          <a href="/logout" class="nav-btn btn-danger" title="Encerrar sessão">
+            [SAIR]
+          </a>
+        {% else %}
+          <a href="/login" class="nav-btn" title="Área administrativa">
+            [OPERADOR]
+          </a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      {% if flash_message %}
+        <div class="flash-banner">
+          <span>&gt;&gt; {{ flash_message }}</span>
+          <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; font-weight:bold; cursor:pointer;">[X]</button>
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- Footer with Digital Odometer -->
+  <footer class="site-footer">
+    <div class="container footer-content">
+      <div>
+        <p><strong>O REFÚGIO</strong> &bull; Espaço pessoal e autoral.</p>
+        <p style="margin-top: 4px;">Construído com FastAPI, SQLite e sem algoritmos predatórios. 2026.</p>
+      </div>
+
+      <!-- Odômetro Digital de Visitas -->
+      <div class="odometer-box" title="Contador de acessos ao monólito">
+        <span class="odometer-label">[VISITAS]:</span>
+        <div class="odometer-digits">
+          {% for digit in total_visits|format_odometer %}
+            <span class="odometer-digit">{{ digit }}</span>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div>
+        <a href="/rss" class="btn btn-amber" style="padding: 6px 12px; font-size: 0.75rem;">
+          [FEED RSS]
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  {% block modal %}{% endblock %}
+
+  <script src="/static/js/main.js"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

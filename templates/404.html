@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}404 - Coordenada Não Encontrada // O Refúgio{% endblock %}
+
+{% block content %}
+  <div style="max-width: 600px; margin: 60px auto; text-align: center;">
+    <div class="card-brutalist" style="border-color: var(--border-pink); box-shadow: 8px 8px 0 var(--border-pink); padding: 40px 20px;">
+      <span style="font-family: var(--font-pixel); font-size: 2.5rem; color: var(--border-pink); display: block; margin-bottom: 20px;">
+        404
+      </span>
+      <h1 style="font-family: var(--font-mono); font-size: 1.3rem; color: #ffffff; margin-bottom: 12px;">
+        [SYS: COORDENADA INEXISTENTE]
+      </h1>
+      <p style="font-family: var(--font-mono); color: var(--text-muted); font-size: 0.95rem; margin-bottom: 25px;">
+        A frequência que você tentou sintonizar não transmite nenhum dado ou foi descontinuada do monólito.
+      </p>
+
+      <div style="border-top: 1px dashed #334155; padding-top: 20px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+        <a href="/" class="btn">
+          &lt;&lt; RETORNAR AO DIÁRIO
+        </a>
+        <a href="/lab" class="btn btn-cyan">
+          EXPLORAR O LAB &gt;&gt;
+        </a>
+      </div>
+    </div>
+  </div>
+{% endblock %}

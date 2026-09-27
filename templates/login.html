@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Autenticação // O Refúgio{% endblock %}
+
+{% block content %}
+  <div style="max-width: 480px; margin: 40px auto;">
+    <div class="card-brutalist" style="border-color: var(--border-green); box-shadow: 6px 6px 0 var(--border-green);">
+      <div style="text-align: center; margin-bottom: 25px;">
+        <span style="font-family: var(--font-pixel); font-size: 1.8rem; color: var(--border-green); display: block; margin-bottom: 10px;">
+          [//R]
+        </span>
+        <h2 style="font-family: var(--font-mono); font-size: 1.2rem; color: #ffffff;">
+          [AUTENTICAÇÃO DO OPERADOR]
+        </h2>
+        <p style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">
+          Área restrita de comando e controle do monólito.
+        </p>
+      </div>
+
+      {% if error %}
+        <div style="background: #2b000f; border: 2px solid var(--border-pink); color: var(--border-pink); font-family: var(--font-mono); font-size: 0.85rem; padding: 10px; margin-bottom: 20px;">
+          &gt;&gt; {{ error }}
+        </div>
+      {% endif %}
+
+      <form action="/login" method="POST">
+        <input type="hidden" name="next" value="{{ next or '/admin' }}">
+
+        <div class="form-group">
+          <label class="form-label" for="username">&gt; IDENTIFICADOR (USUÁRIO)</label>
+          <input type="text" id="username" name="username" class="form-input" placeholder="admin" required autofocus>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">&gt; CÓDIGO DE ACESSO (SENHA)</label>
+          <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required>
+        </div>
+
+        <button type="submit" class="btn" style="width: 100%; justify-content: center; margin-top: 10px;">
+          CONECTAR AO TERMINAL &gt;&gt;
+        </button>
+      </form>
+
+      <div style="margin-top: 25px; border-top: 1px dashed #334155; padding-top: 15px; text-align: center;">
+        <small style="font-family: var(--font-mono); color: var(--text-dim); font-size: 0.75rem;">
+          Ambiente protegido por cookies de sessão HTTP-Only assinados.
+        </small>
+      </div>
+    </div>
+  </div>
+{% endblock %}

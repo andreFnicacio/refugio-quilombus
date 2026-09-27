@@ -1,0 +1,20 @@
+services:
+  refugio:
+    build: .
+    container_name: refugio_monolith
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Persistência do banco de dados SQLite no host
+      - ./blog.db:/app/blog.db
+      # Persistência dos uploads locais no host (evita perda de mídias ao recriar container)
+      - ./static/uploads:/app/static/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

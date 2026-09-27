@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}O Manifesto // O Refúgio{% endblock %}
+
+{% block content %}
+  <article class="card-brutalist" style="border-color: var(--border-cyan); box-shadow: 6px 6px 0 var(--border-cyan);">
+    <div class="section-label">
+      <span>[MANIFESTO &amp; FILOSOFIA DE EXISTÊNCIA]</span>
+    </div>
+
+    <h1 style="font-family: var(--font-pixel); font-size: 1.6rem; color: #ffffff; margin: 15px 0 25px 0; line-height: 1.4;">
+      O REFÚGIO: TRINCHEIRAS NA ERA DOS ALGORITMOS
+    </h1>
+
+    <div class="post-content">
+      <p>
+        Houve um tempo em que a internet não era um shopping center corporativo administrado por quatro monopólios de dados. A web era feita de cantos estranhos, páginas autorais com fundo preto, contadores de visitas em GIF, fóruns e blogs onde as pessoas escreviam porque tinham algo a dizer — e não para alimentar métricas de retenção.
+      </p>
+
+      <h2>1. A Saga dos 28 Anos</h2>
+      <p>
+        Aos 28, a vida cobra clareza. É a encruzilhada entre os impulsos dos vinte e a responsabilidade da maturidade. Este espaço é o meu diário de bordo aberto sobre saúde, transição de carreira, o ofício da engenharia de software e a busca por consistência e disciplina.
+      </p>
+
+      <h2>2. Cultura, Mangás e Silêncio</h2>
+      <p>
+        Entre uma linha de código e outra, as páginas a nanquim de Takehiko Inoue (<em>Vagabond</em>) e Kentaro Miura (<em>Berserk</em>) nos lembram que maestria não se compra em curso relâmpago. Aqui compartilhamos reflexões profundas sobre mangás, cinema autoral e as obras que nos fazem parar para pensar.
+      </p>
+
+      <h2>3. O Laboratório da Comunidade</h2>
+      <p>
+        Um hub colaborativo sem paywall e sem algoritmo. Criou um minijogo? Fez um script CLI útil? Construiu um shader pixel-art? O Laboratório é o espaço para os amigos e desenvolvedores colocarem seus códigos em evidência. Cada clique conta, o ranking é transparente e o código é livre.
+      </p>
+
+      <blockquote>
+        "Se a internet virou uma selva de ruído e estímulos infinitos, O Refúgio é a cabana no topo da montanha com café fresco, conexão estável e uma lareira acesa."
+      </blockquote>
+
+      <h2>Stack &amp; Arquitetura Técnica</h2>
+      <ul style="margin-left: 20px; margin-bottom: 20px; font-family: var(--font-mono); font-size: 0.95rem; line-height: 1.8;">
+        <li><strong>Backend:</strong> Python 3.10+ &bull; FastAPI assíncrono</li>
+        <li><strong>Banco de Dados:</strong> SQLite monolítico em arquivo local</li>
+        <li><strong>Templates:</strong> Jinja2 com HTML puro e CSS Neo-Brutalista</li>
+        <li><strong>Design System:</strong> Retrô 16-bits &bull; Paleta Terminal Neon &bull; Zero frameworks pesados de frontend</li>
+        <li><strong>IndieWeb:</strong> RSS Nativo &bull; Anti-Spam com Honeypot &bull; Background Tasks para notificações</li>
+      </ul>
+
+      <div style="margin-top: 30px;">
+        <a href="/" class="btn">ACESSAR O DIÁRIO &gt;&gt;</a>
+        <a href="/lab" class="btn btn-cyan" style="margin-left: 10px;">EXPLORAR O LAB &gt;&gt;</a>
+      </div>
+    </div>
+  </article>
+{% endblock %}

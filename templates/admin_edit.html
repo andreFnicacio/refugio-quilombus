@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Post #{{ post.id }} // Painel de Controle{% endblock %}
+
+{% block content %}
+  <div style="margin-bottom: 25px;">
+    <a href="/admin?tab=posts" class="btn" style="padding: 6px 12px; font-size: 0.8rem;">
+      &lt;&lt; RETORNAR AO PAINEL DE CONTROLE
+    </a>
+  </div>
+
+  <div class="card-brutalist" style="border-color: var(--border-amber); box-shadow: 6px 6px 0 var(--border-amber);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <h2 style="font-family: var(--font-pixel); font-size: 1.1rem; color: var(--border-amber);">
+          [MODIFICAR ENTRADA #{{ post.id }}]
+        </h2>
+        <p style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">
+          // SLUG ATUAL: /post/{{ post.slug }}
+        </p>
+      </div>
+
+      <a href="/post/{{ post.slug }}" target="_blank" class="btn btn-cyan" style="padding: 6px 12px; font-size: 0.75rem;">
+        VISITAR POST PUBLICADO &gt;&gt;
+      </a>
+    </div>
+
+    <form action="/admin/posts/{{ post.id }}/edit" method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label class="form-label" for="title">Título do Post *</label>
+        <input type="text" id="title" name="title" class="form-input" value="{{ post.title }}" required>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+        <div class="form-group">
+          <label class="form-label" for="category">Categoria *</label>
+          <input type="text" id="category" name="category" class="form-input" value="{{ post.category }}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="media_url">URL da Capa (Opcional)</label>
+          <input type="url" id="media_url" name="media_url" class="form-input" value="{{ post.media_url or '' }}" placeholder="https://images.unsplash.com/...">
+        </div>
+      </div>
+
+      {% if post.media_url %}
+        <div style="margin-bottom: 18px; padding: 10px; background: #000; border: 1px solid #334155; display: inline-block;">
+          <small style="font-family: var(--font-mono); color: var(--text-dim); display: block; margin-bottom: 6px;">Capa Atual:</small>
+          <img src="{{ post.media_url }}" alt="Capa atual" style="max-height: 120px; object-fit: cover; border: 1px solid #475569;">
+        </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label class="form-label" for="media_file">Substituir por Upload Local de Imagem (PNG, JPG, WEBP - max 5MB)</label>
+        <input type="file" id="media_file" name="media_file" class="form-input" accept="image/*">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="content">Conteúdo (Markdown Completo e HTML Rico) *</label>
+        <textarea id="content" name="content" class="form-textarea" style="min-height: 350px;" required>{{ post.content }}</textarea>
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-top: 25px;">
+        <button type="submit" class="btn btn-amber">
+          SALVAR ALTERAÇÕES &gt;&gt;
+        </button>
+        <a href="/admin?tab=posts" class="btn btn-danger">
+          CANCELAR
+        </a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

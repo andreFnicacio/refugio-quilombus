@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}O Laboratório da Comunidade // O Refúgio{% endblock %}
+
+{% block content %}
+  {% if submitted %}
+    <div class="flash-banner" style="border-color: var(--border-cyan); box-shadow: 4px 4px 0 var(--border-cyan); color: var(--border-cyan);">
+      <span>&gt;&gt; Projeto recebido com sucesso! Ele passará pela moderação do operador antes de ser exibido no terminal.</span>
+      <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; font-weight:bold; cursor:pointer;">[X]</button>
+    </div>
+  {% endif %}
+
+  <!-- Lab Header Banner -->
+  <section class="lab-header">
+    <div>
+      <h1 style="font-family: var(--font-pixel); font-size: 1.3rem; color: var(--border-cyan); margin-bottom: 10px;">
+        O LABORATÓRIO [HUB]
+      </h1>
+      <p style="color: var(--text-muted); max-width: 650px; font-size: 0.95rem;">
+        Espaço colaborativo para amigos e desenvolvedores publicarem projetos open-source, scripts úteis e minijogos. Cada clique no repositório pontua no ranking.
+      </p>
+    </div>
+    <div>
+      <button type="button" class="btn btn-cyan" data-open-modal="modal-submission">
+        + SUBMETER PROJETO
+      </button>
+    </div>
+  </section>
+
+  <!-- Top 5 Podium Ranking -->
+  {% if top_5 %}
+    <section class="top5-container">
+      <div class="section-label">
+        <span>★ TOP 5 PROJETOS MAIS ACESSADOS</span>
+      </div>
+
+      <div class="top5-grid">
+        {% for project in top_5 %}
+          <div class="top5-card">
+            <span class="top5-rank-badge">#{{ loop.index }}</span>
+            <div>
+              <span class="badge-cat" style="font-size: 0.7rem; margin-bottom: 8px;">{{ project.category }}</span>
+              <h3 style="font-family: var(--font-mono); font-size: 1.15rem; color: #ffffff; margin-bottom: 6px;">
+                {{ project.title }}
+              </h3>
+              <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 14px;">
+                {{ project.description[:120] }}...
+              </p>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #334155; padding-top: 12px; margin-top: 10px;">
+              <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--border-green);">
+                ⚡ {{ project.clicks_count }} cliques
+              </span>
+              <a href="/lab/redirect/{{ project.id }}" target="_blank" rel="noopener noreferrer" class="btn btn-amber" style="padding: 4px 10px; font-size: 0.75rem;">
+                VISITAR &gt;&gt;
+              </a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  <!-- Category filter bar -->
+  <div class="category-filter-bar">
+    <a href="/lab" class="filter-pill {% if not current_category %}active{% endif %}">
+      [TODOS OS PROJETOS]
+    </a>
+    {% for cat in categories %}
+      <a href="/lab?category={{ cat|urlencode }}" class="filter-pill {% if current_category == cat %}active{% endif %}">
+        [{{ cat | upper }}]
+      </a>
+    {% endfor %}
+  </div>
+
+  <!-- All Submissions Grid -->
+  <section class="submissions-grid">
+    {% if submissions %}
+      {% for sub in submissions %}
+        <div class="submission-card">
+          {% if sub.image_url %}
+            <img src="{{ sub.image_url }}" alt="{{ sub.title }}" style="width: 100%; height: 160px; object-fit: cover; border: 1px solid #334155; margin-bottom: 12px;">
+          {% endif %}
+
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span class="badge-cat" style="margin-bottom: 0;">{{ sub.category }}</span>
+              <span class="clicks-info">★ {{ sub.clicks_count }} acessos</span>
+            </div>
+
+            <h3 style="font-family: var(--font-mono); font-size: 1.2rem; color: #ffffff; margin-bottom: 6px;">
+              {{ sub.title }}
+            </h3>
+
+            <p style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--border-amber); margin-bottom: 10px;">
+              por: {{ sub.author_name }}
+            </p>
+
+            <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 18px;">
+              {{ sub.description }}
+            </p>
+          </div>
+
+          <div style="border-top: 1px solid #334155; padding-top: 14px; margin-top: auto; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">
+              {{ sub.created_at|format_datetime }}
+            </span>
+            <a href="/lab/redirect/{{ sub.id }}" target="_blank" rel="noopener noreferrer" class="btn" style="padding: 6px 12px; font-size: 0.8rem;">
+              ACESSAR GITHUB &gt;&gt;
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="card-brutalist" style="grid-column: 1 / -1; text-align: center; padding: 40px;">
+        <p style="color: var(--text-muted); font-family: var(--font-mono);">
+          Nenhum projeto encontrado nesta categoria. Seja o primeiro a submeter!
+        </p>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}
+
+{% block modal %}
+  <!-- Retro 16-bits Submission Modal -->
+  <div class="modal-overlay" id="modal-submission">
+    <div class="modal-window">
+      <div class="modal-titlebar">
+        <span>[SYS: SUBMETER PROJETO AO LAB]</span>
+        <button type="button" class="modal-close-btn" data-close-modal>[X]</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
+          Seu projeto será avaliado pelo operador do monólito. Uma vez aprovado, ele aparecerá na listagem e competirá no Top 5!
+        </p>
+
+        <form action="/lab/submit" method="POST">
+          <!-- Honeypot anti-spam -->
+          <div class="hp-field">
+            <label for="website_hp_lab">Não preencha este campo se você for humano:</label>
+            <input type="text" name="website_hp" id="website_hp_lab" autocomplete="off" tabindex="-1">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label" for="lab_name">Seu Nome / Dev Tag *</label>
+              <input type="text" id="lab_name" name="author_name" class="form-input" placeholder="Ex: Dixie, Kaizen" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="lab_email">Seu E-mail * (privado)</label>
+              <input type="email" id="lab_email" name="author_email" class="form-input" placeholder="contato@dev.net" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="lab_title">Título do Projeto *</label>
+            <input type="text" id="lab_title" name="title" class="form-input" placeholder="Ex: CLI Pomodoro, Shader Canvas..." required>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label class="form-label" for="lab_category">Categoria *</label>
+              <select id="lab_category" name="category" class="form-select">
+                <option value="Scripts Úteis">Scripts Úteis</option>
+                <option value="Ferramentas de IA">Ferramentas de IA</option>
+                <option value="Jogos 2D">Jogos 2D</option>
+                <option value="Open Source">Open Source</option>
+                <option value="Hacking & Terminal">Hacking &amp; Terminal</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="lab_github">Link do Repositório (GitHub / GitLab) *</label>
+              <input type="url" id="lab_github" name="github_link" class="form-input" placeholder="https://github.com/usuario/repo" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="lab_image">URL da Imagem / Screenshot (Opcional)</label>
+            <input type="url" id="lab_image" name="image_url" class="form-input" placeholder="https://images.unsplash.com/...">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="lab_description">Descrição do Projeto *</label>
+            <textarea id="lab_description" name="description" class="form-textarea" placeholder="O que faz? Quais tecnologias usa? Por que foi feito?" required></textarea>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+            <button type="button" class="btn btn-danger" data-close-modal>CANCELAR</button>
+            <button type="submit" class="btn btn-cyan">ENVIAR PROJETO &gt;&gt;</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock %}
