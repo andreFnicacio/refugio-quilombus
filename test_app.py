@@ -351,25 +351,40 @@ def test_admin_edit_post_workflow(client):
     db = SessionLocal()
     post = db.query(Post).first()
     post_id = post.id
+    orig_title = post.title
+    orig_category = post.category
+    orig_content = post.content
     db.close()
 
-    # 1. Carrega tela de edição GET
-    resp_edit_page = client.get(f"/admin/posts/{post_id}/edit", cookies=cookies)
-    assert resp_edit_page.status_code == 200
-    assert f"MODIFICAR ENTRADA #{post_id}" in resp_edit_page.text
+    try:
+        # 1. Carrega tela de edição GET
+        resp_edit_page = client.get(f"/admin/posts/{post_id}/edit", cookies=cookies)
+        assert resp_edit_page.status_code == 200
+        assert f"MODIFICAR ENTRADA #{post_id}" in resp_edit_page.text
 
-    # 2. Salva modificação POST
-    new_title = f"Título Modificado no Patch Test {post_id}"
-    update_data = {
-        "title": new_title,
-        "category": "Dev & Tech",
-        "content": "Conteúdo modificado com sucesso e validado pelo teste automatizado."
-    }
-    resp_update = client.post(f"/admin/posts/{post_id}/edit", data=update_data, cookies=cookies, follow_redirects=False)
-    assert resp_update.status_code == 303
+        # 2. Salva modificação POST
+        new_title = f"Título Modificado no Patch Test {post_id}"
+        update_data = {
+            "title": new_title,
+            "category": "Dev & Tech",
+            "content": "Conteúdo modificado com sucesso e validado pelo teste automatizado."
+        }
+        resp_update = client.post(f"/admin/posts/{post_id}/edit", data=update_data, cookies=cookies, follow_redirects=False)
+        assert resp_update.status_code == 303
 
-    db = SessionLocal()
-    updated_post = db.query(Post).filter(Post.id == post_id).first()
-    assert updated_post.title == new_title
-    db.close()
+        db = SessionLocal()
+        updated_post = db.query(Post).filter(Post.id == post_id).first()
+        assert updated_post.title == new_title
+        db.close()
+    finally:
+        # Restaura o estado original para manter o teste idempotente
+        db = SessionLocal()
+        p = db.query(Post).filter(Post.id == post_id).first()
+        if p:
+            p.title = orig_title
+            p.category = orig_category
+            p.content = orig_content
+            db.commit()
+        db.close()
+
 
