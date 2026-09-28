@@ -12,8 +12,7 @@
 #   5. Verificação de integridade do banco (nenhuma tabela pode perder linhas);
 #      se algo regredir, RESTAURA automaticamente o backup feito no passo 1
 #   6. docker compose up -d --build  +  checagem de saúde do monólito (/health)
-#   7. Aviso (não-fatal) se o nginx do host estiver apontando para a porta errada (8000)
-#   8. Clone / espelhamento do projeto com redundância (HTTPS -> SSH -> Local)
+#   7. Aviso (não-fatal) se o nginx do host estiver apontando para a porta errada (8092)
 #
 # Uso:   ./update.bash
 #
@@ -65,7 +64,7 @@ docker compose version >/dev/null 2>&1 || die "'docker compose' indisponível"
 ok "Ambiente ok (Serviço: $APP_SERVICE, SQLite: $DB_FILE)"
 
 # ── 1. BACKUP (Snapshot seguro do SQLite em modo WAL) ──────────────────────
-log "1/8 — Backup atômico do banco de dados SQLite (WAL)"
+log "1/7 — Backup atômico do banco de dados SQLite (WAL)"
 mkdir -p "$BACKUP_DIR"
 BACKUP_FILE="${BACKUP_DIR}/refugio_${DB_FILE}_$(date +%Y%m%d_%H%M%S).db.gz"
 TEMP_BACKUP="${BACKUP_DIR}/.temp_backup.db"
@@ -127,7 +126,7 @@ snapshot_counts "$BEFORE_COUNTS"
 ok "Baseline de integridade capturado ($(wc -l < "$BEFORE_COUNTS") tabelas monitoradas)"
 
 # ── 2. GIT PULL ────────────────────────────────────────────────────────────
-log "2/8 — git pull (mesclando remoto no local)"
+log "2/7 — git pull (mesclando remoto no local)"
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "não é um repositório git"
 
 # Árvore suja atrapalha o merge: aborta cedo com motivo claro
@@ -165,7 +164,7 @@ else
 fi
 
 # ── 3. VERIFICAÇÃO DE ERROS (Sintaxe e Testes Automatizados) ───────────────
-log "3/8 — Verificando sintaxe e integridade do código"
+log "3/7 — Verificando sintaxe e integridade do código"
 $PYTHON -m py_compile main.py models.py database.py auth.py config.py manage.py \
   || die "Erro de sintaxe Python detectado! Atualização abortada."
 ok "Compilação de bytecode Python aprovada (sem erros de sintaxe)"
@@ -181,7 +180,7 @@ if [ -f "test_app.py" ]; then
 fi
 
 # ── 4. MIGRAÇÕES E SCHEMAS PENDENTES ───────────────────────────────────────
-log "4/8 — Aplicando schemas e dados de seed pendentes"
+log "4/7 — Aplicando schemas e dados de seed pendentes"
 if $PYTHON manage.py init > /tmp/refugio_init.log 2>&1; then
   ok "Estruturas de tabelas e seeds verificadas com sucesso"
 else
@@ -192,7 +191,7 @@ else
 fi
 
 # ── 5. INTEGRIDADE DO BANCO ────────────────────────────────────────────────
-log "5/8 — Verificando integridade dos dados no SQLite"
+log "5/7 — Verificando integridade dos dados no SQLite"
 snapshot_counts "$AFTER_COUNTS"
 REGRESSION=0
 while read -r tbl before; do
@@ -213,7 +212,7 @@ fi
 ok "Integridade ok — nenhuma tabela perdeu registros"
 
 # ── 6. DEPLOY COM DOCKER COMPOSE ───────────────────────────────────────────
-log "6/8 — docker compose up -d --build"
+log "6/7 — docker compose up -d --build"
 docker compose up -d --build || die "docker compose up --build falhou"
 
 log "  Aguardando o monólito subir e responder no healthcheck..."
@@ -234,7 +233,7 @@ else
 fi
 
 # ── 7. SANIDADE DO PROXY DO HOST (Nginx) ───────────────────────────────────
-log "7/8 — Conferindo proxy reverso do host (nginx)"
+log "7/7 — Conferindo proxy reverso do host (nginx)"
 NGINX_SITE="/etc/nginx/sites-available/refugio"
 if [ -r "$NGINX_SITE" ]; then
   PROXY_PORT="$(grep -oE 'proxy_pass http://127\.0\.0\.1:[0-9]+' "$NGINX_SITE" | grep -oE '[0-9]+$' | head -1)"
@@ -257,56 +256,3 @@ echo "  • Status:   http://127.0.0.1:${PORT}/health"
 echo "  • Monólito: http://127.0.0.1:${PORT}"
 printf '%s═══════════════════════════════════════════════%s\n' "$C_OK" "$C_RESET"
 
-# ── 8. CLONE COM REDUNDÂNCIA (Espelho de Backup do Projeto) ────────────────
-log "8/8 — Sincronizando clone com redundância do projeto (refugio-quilombus)"
-
-REPO_URL_HTTPS="https://github.com/andreFnicacio/refugio-quilombus.git"
-REPO_URL_SSH="git@github.com:andreFnicacio/refugio-quilombus.git"
-CLONE_TARGET_DIR="${REDUNDANT_CLONE_DIR:-../refugio-quilombus-mirror}"
-
-clone_project_with_redundancy() {
-  local target="$1"
-
-  if [ -d "$target/.git" ]; then
-    log "  Repositório redundante já existe em '$target'. Atualizando..."
-    (
-      cd "$target"
-      git fetch --all --quiet 2>/dev/null || true
-      if git pull --no-rebase --quiet 2>/dev/null; then
-        ok "Repositório redundante atualizado em $target"
-        return 0
-      fi
-      warn "Pull no repositório existente falhou. Tentando re-sincronizar remotos..."
-    )
-  fi
-
-  mkdir -p "$(dirname "$target")"
-
-  # Tentativa 1: Clone via HTTPS
-  log "  [1/3] Tentando clone via HTTPS ($REPO_URL_HTTPS)..."
-  if git clone --depth 50 "$REPO_URL_HTTPS" "$target" 2>/dev/null; then
-    ok "Clone redundante concluído via HTTPS em: $target"
-    return 0
-  fi
-  warn "Tentativa 1 (HTTPS) falhou."
-
-  # Tentativa 2: Redundância via SSH
-  log "  [2/3] Tentando redundância via SSH ($REPO_URL_SSH)..."
-  if git clone --depth 50 "$REPO_URL_SSH" "$target" 2>/dev/null; then
-    ok "Clone redundante concluído via SSH em: $target"
-    return 0
-  fi
-  warn "Tentativa 2 (SSH) falhou."
-
-  # Tentativa 3: Redundância local a partir do workspace atual
-  log "  [3/3] Tentando clone a partir do workspace local ($SCRIPT_DIR)..."
-  if git clone --depth 50 "$SCRIPT_DIR" "$target" 2>/dev/null; then
-    ok "Clone redundante concluído a partir do repositório local em: $target"
-    return 0
-  fi
-
-  warn "Aviso: Todas as tentativas de clone redundante falharam (rede/permissão)."
-  return 1
-}
-
-clone_project_with_redundancy "$CLONE_TARGET_DIR" || warn "Clone com redundância finalizado com avisos (veja logs acima)."
