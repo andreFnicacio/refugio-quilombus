@@ -388,3 +388,52 @@ def test_admin_edit_post_workflow(client):
         db.close()
 
 
+def test_admin_category_dropdown_and_custom_creation(client):
+    import uuid
+    from auth import create_session_token
+    token = create_session_token(settings.ADMIN_USERNAME)
+    cookies = {settings.SESSION_COOKIE_NAME: token}
+
+    # 1. Verifica se o painel administrativo carrega o <select> com categorias
+    resp_admin = client.get("/admin?tab=new_post", cookies=cookies)
+    assert resp_admin.status_code == 200
+    assert 'id="category_select"' in resp_admin.text
+    assert '<option value="Saga dos 28">Saga dos 28</option>' in resp_admin.text
+    assert '<option value="__custom__">+ [CRIAR NOVA CATEGORIA...]</option>' in resp_admin.text
+
+    # 2. Cria post com categoria customizada via dropdown "__custom__"
+    custom_post_title = f"Post com Categoria Nova {uuid.uuid4().hex[:6]}"
+    custom_category_name = "Automação & Cyberpunk"
+    post_payload = {
+        "title": custom_post_title,
+        "category": "__custom__",
+        "category_custom": custom_category_name,
+        "content": "Testando seleção customizada no dropdown do admin."
+    }
+    resp_create = client.post("/admin/posts/new", data=post_payload, cookies=cookies, follow_redirects=False)
+    assert resp_create.status_code == 303
+
+    db = SessionLocal()
+    created_post = db.query(Post).filter(Post.title == custom_post_title).first()
+    assert created_post is not None
+    assert created_post.category == custom_category_name
+    created_post_id = created_post.id
+    db.close()
+
+    # 3. Verifica se a tela de edição preseleciona a categoria correta
+    resp_edit = client.get(f"/admin/posts/{created_post_id}/edit", cookies=cookies)
+    assert resp_edit.status_code == 200
+    assert "Automação" in resp_edit.text
+    assert "Cyberpunk" in resp_edit.text
+    assert "selected" in resp_edit.text
+
+    # Limpeza
+    db = SessionLocal()
+    p = db.query(Post).filter(Post.id == created_post_id).first()
+    if p:
+        db.delete(p)
+        db.commit()
+    db.close()
+
+
+

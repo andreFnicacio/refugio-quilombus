@@ -92,3 +92,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 });
+
+// 5. Alternador dinâmico de Categoria Customizada no Painel Admin
+window.toggleCustomCategory = function(selectElem, wrapperId, inputId) {
+  const wrapper = document.getElementById(wrapperId);
+  const input = document.getElementById(inputId);
+  if (!wrapper || !input) return;
+
+  if (selectElem.value === "__custom__") {
+    wrapper.style.display = "block";
+    input.required = true;
+    input.focus();
+  } else {
+    wrapper.style.display = "none";
+    input.required = false;
+    input.value = "";
+  }
+};
+

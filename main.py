@@ -630,6 +630,24 @@ def logout():
 
 # --- ÁREA ADMINISTRATIVA PROTEGIDA ---
 
+DEFAULT_POST_CATEGORIES = [
+    "Saga dos 28",
+    "Dev & Tech",
+    "Mangás & Cultura",
+    "IndieWeb & Minimalismo",
+    "Hacking & Terminal",
+    "Reflexões & Carreira",
+    "Geral"
+]
+
+
+def get_available_post_categories(db: Session) -> list[str]:
+    """Retorna lista ordenada e consolidada de categorias disponíveis para posts."""
+    db_cats = [c[0].strip() for c in db.query(Post.category).distinct().all() if c[0] and c[0].strip()]
+    merged = list(dict.fromkeys(DEFAULT_POST_CATEGORIES + db_cats))
+    return sorted(merged)
+
+
 @app.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(
     request: Request,
@@ -659,6 +677,9 @@ def admin_dashboard(
     )
     recent_comments = db.query(Comment).order_by(Comment.created_at.desc()).limit(30).all()
 
+    # Categorias consolidadas para o dropdown de criação de posts
+    available_categories = get_available_post_categories(db)
+
     # Métricas gerais
     stats = {
         "total_posts": len(posts),
@@ -676,6 +697,7 @@ def admin_dashboard(
             "admin_user": admin_user,
             "current_user": admin_user,
             "posts": posts,
+            "categories": available_categories,
             "pending_submissions": pending_submissions,
             "approved_submissions": approved_submissions,
             "rejected_submissions": rejected_submissions,
@@ -693,6 +715,7 @@ async def admin_create_post(
     title: str = Form(...),
     content: str = Form(...),
     category: str = Form("Geral"),
+    category_custom: Optional[str] = Form(None),
     media_url: Optional[str] = Form(None),
     media_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
@@ -700,7 +723,15 @@ async def admin_create_post(
 ):
     title = clean_plain_text(title)
     content = content.strip()
-    category = clean_plain_text(category)
+
+    # Suporte a dropdown com opção de criar nova categoria customizada
+    if category == "__custom__" and category_custom:
+        category = clean_plain_text(category_custom)
+    else:
+        category = clean_plain_text(category)
+
+    if not category or category == "__custom__":
+        category = "Geral"
 
     final_media_url = media_url.strip() if media_url else None
 
@@ -756,6 +787,8 @@ def admin_edit_post_page(
     if not post:
         raise HTTPException(status_code=404, detail="Post não encontrado")
 
+    available_categories = get_available_post_categories(db)
+
     return templates.TemplateResponse(
         request=request,
         name="admin_edit.html",
@@ -763,6 +796,7 @@ def admin_edit_post_page(
             "admin_user": admin_user,
             "current_user": admin_user,
             "post": post,
+            "categories": available_categories,
             "total_visits": get_site_visits(db)
         }
     )
@@ -774,6 +808,7 @@ async def admin_edit_post(
     title: str = Form(...),
     content: str = Form(...),
     category: str = Form("Geral"),
+    category_custom: Optional[str] = Form(None),
     media_url: Optional[str] = Form(None),
     media_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
@@ -785,7 +820,14 @@ async def admin_edit_post(
 
     post.title = clean_plain_text(title)
     post.content = content.strip()
-    post.category = clean_plain_text(category)
+
+    if category == "__custom__" and category_custom:
+        post.category = clean_plain_text(category_custom)
+    else:
+        post.category = clean_plain_text(category)
+
+    if not post.category or post.category == "__custom__":
+        post.category = "Geral"
 
     if media_url:
         post.media_url = media_url.strip()
