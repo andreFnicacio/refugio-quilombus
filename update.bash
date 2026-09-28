@@ -44,7 +44,7 @@ APP_SERVICE="refugio"     # serviço do compose
 DB_FILE="blog.db"         # arquivo do banco SQLite
 BACKUP_DIR="backups"
 BACKUP_FILE=""            # preenchido no passo 1
-PORT="8000"
+PORT="${PORT:-8092}"
 
 # Executável do Python (usa .venv se disponível, senão python3 do sistema)
 if [ -x ".venv/bin/python" ]; then
