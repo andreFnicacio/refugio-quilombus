@@ -21,29 +21,42 @@ def test_health_check(client):
 
 
 def test_homepage_and_odometer(client):
+    db = SessionLocal()
+    stat_before = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
+    val_before = stat_before.value if stat_before else 0
+    db.close()
+
     response = client.get("/")
     assert response.status_code == 200
     assert "O REFÚGIO" in response.text
     assert "DIÁRIO" in response.text
     assert "VISITAS" in response.text
-    assert "Manifesto do Refúgio" in response.text
+    assert "Vagabond, Berserk e a Busca pelo Silêncio Interior" in response.text
+
+    # Garante que o contador de visitas do odômetro foi incrementado
+    db = SessionLocal()
+    stat_after = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
+    assert stat_after.value == val_before + 1
+    db.close()
 
 
 def test_post_detail_and_views_increment(client):
     db = SessionLocal()
-    post = db.query(Post).filter(Post.slug == "manifesto-do-refugio-trincheiras-era-dos-algoritmos").first()
+    post = db.query(Post).filter(Post.slug == "vagabond-berserk-e-a-busca-pelo-silencio-interior").first()
+    assert post is not None
     initial_views = post.views_count
     db.close()
 
-    response = client.get("/post/manifesto-do-refugio-trincheiras-era-dos-algoritmos")
+    response = client.get("/post/vagabond-berserk-e-a-busca-pelo-silencio-interior")
     assert response.status_code == 200
-    assert "Construindo Trincheiras na Era dos Algoritmos" in response.text
+    assert "Entre a Espada e a Serenidade" in response.text
 
-    # Verifica se incrementou views
+    # Verifica se incrementou views do post
     db = SessionLocal()
-    post_updated = db.query(Post).filter(Post.slug == "manifesto-do-refugio-trincheiras-era-dos-algoritmos").first()
+    post_updated = db.query(Post).filter(Post.slug == "vagabond-berserk-e-a-busca-pelo-silencio-interior").first()
     assert post_updated.views_count == initial_views + 1
     db.close()
+
 
 
 def test_comment_honeypot_blocking(client):
@@ -91,7 +104,8 @@ def test_community_lab_and_top5(client):
     assert response.status_code == 200
     assert "O LABORATÓRIO" in response.text
     assert "TOP 5 PROJETOS MAIS ACESSADOS" in response.text
-    assert "Dungeon Crawler 16-bits" in response.text
+    assert "RMG" in response.text
+    assert "Rosalie&#39;s Mupen GUI" in response.text or "Rosalie's Mupen GUI" in response.text
 
 
 def test_lab_submission_and_honeypot(client):
@@ -299,17 +313,17 @@ def test_rate_limiting_protection(client):
 
 
 def test_category_filter_with_ampersand(client):
-    # Categoria com '&' (Dev & Tech)
-    resp = client.get("/?category=Dev%20%26%20Tech")
-    assert resp.status_code == 200
-    assert "Por que Monólitos em SQLite e FastAPI Ainda Dominam o Mundo Real" in resp.text
-    assert "[TERMINAL SILENCIOSO]" not in resp.text
-
-    # Categoria Mangás & Cultura
+    # Categoria com '&' (Mangás & Cultura)
     resp_mangas = client.get("/?category=Mang%C3%A1s%20%26%20Cultura")
     assert resp_mangas.status_code == 200
     assert "Vagabond, Berserk" in resp_mangas.text
     assert "[TERMINAL SILENCIOSO]" not in resp_mangas.text
+
+    # Categoria inexistente ou vazia deve exibir o estado de terminal silencioso
+    resp_empty = client.get("/?category=Categoria+Inexistente")
+    assert resp_empty.status_code == 200
+    assert "[TERMINAL SILENCIOSO]" in resp_empty.text
+
 
 
 def test_github_link_stored_xss_protection(client):

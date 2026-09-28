@@ -9,7 +9,7 @@ logger = logging.getLogger("refugio.init_db")
 
 
 def init_database():
-    """Cria tabelas e popula com dados iniciais (Seed Anti-Tela Pelada)."""
+    """Cria tabelas e popula com dados iniciais limpos (1 post rico e 1 projeto no Lab)."""
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
@@ -24,187 +24,94 @@ def init_database():
             )
             db.add(admin_user)
             db.commit()
-            logger.info(f"[SEED] Usuário admin '{settings.ADMIN_USERNAME}' criado com sucesso.")
+            logger.info(f"[SEED] Usuário admin '{settings.ADMIN_USERNAME}' configurado com sucesso.")
 
-        # 2. Contador de Visitas Digital
+        # 2. Contador de Visitas Digital (zerado para os primeiros acessos)
         visit_stat = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
         if not visit_stat:
-            visit_stat = SiteStat(key="total_visits", value=1337)
+            visit_stat = SiteStat(key="total_visits", value=0)
             db.add(visit_stat)
             db.commit()
-            logger.info("[SEED] Contador de visitas inicializado em 1337.")
+            logger.info("[SEED] Contador de visitas inicializado em 0.")
 
-        # 3. Posts Iniciais ("Anti-Tela Pelada")
+        # 3. Post Inaugural Único: Vagabond, Berserk e a Busca pelo Silêncio Interior
         posts_count = db.query(Post).count()
         if posts_count == 0:
-            posts_seed = [
-                Post(
-                    title="Manifesto do Refúgio: Construindo Trincheiras na Era dos Algoritmos",
-                    slug="manifesto-do-refugio-trincheiras-era-dos-algoritmos",
-                    category="Saga dos 28",
-                    media_url="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1200&auto=format&fit=crop",
-                    views_count=142,
-                    content="""# O Refúgio: Nossa Trincheira Digital
+            post_seed = Post(
+                title="Vagabond, Berserk e a Busca pelo Silêncio Interior",
+                slug="vagabond-berserk-e-a-busca-pelo-silencio-interior",
+                category="Mangás & Cultura",
+                media_url="https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=1200&auto=format&fit=crop",
+                views_count=0,
+                content="""# Entre a Espada e a Serenidade: O Silêncio na Era do Ruído
 
-A internet moderna virou um feed infinito de dopamina barata, métricas de vaidade e algoritmos desenhados para roubar a sua atenção antes mesmo de você terminar o seu primeiro café da manhã.
+Existe uma diferença brutal entre ter vinte anos e beirar os vinte e oito. Aos vinte, o mundo parece uma arena aberta: você quer provar que é capaz, devora tutoriais como se fossem duelos de vida ou morte e acredita, no íntimo, que o segredo da vida é ser o guerreiro mais barulhento e implacável da colina.
 
-**O Refúgio nasce do cansaço desse modelo.**
+Quando li **Vagabond** pela primeira vez, minha obsessão era pela técnica de Musashi Miyamoto. A ferocidade dos cortes, a busca cega por ser "invencível sob o sol". Na mesma época, **Berserk** me fascinava pelo peso descomunal da *Dragon Slayer* e pela fúria inextinguível de Guts contra os apóstolos do destino.
 
-Aqui não tem anúncio pulando na sua cara, não tem rastreador vendendo o seu histórico para corretores de dados, nem inteligência artificial gerando lixo em massa só para ranquear no Google. 
+Anos depois, cercado por notificações incessantes, prazos de entrega e o zumbido estéril dos algoritmos predando nossa atenção a cada segundo, reli essas duas obras. E percebi algo desconcertante: **eu não tinha entendido absolutamente nada.**
 
-### Os Três Pilares Deste Espaço:
+---
 
-1. **Diário de Bordo & A Saga dos 28 Anos:** Crônicas sinceras sobre transição de carreira, o peso do amadurecimento, rotinas de saúde e os altos e baixos de viver de código.
-2. **Cultura & Hobbies:** Reflexões profundas sobre mangás que moldaram caráter (de *Vagabond* a *Berserk*), cinema analógico e jogos que realmente respeitam o tempo do jogador.
-3. **O Laboratório da Comunidade:** Um hub aberto e colaborativo para compartilhar ferramentas, scripts e protótipos que nasceram da curiosidade pura.
+### 1. A Lição de Musashi: O Infinito Dentro de Si
 
-> *"Se você não constrói o seu próprio espaço na web, você é apenas um inquilino pagando aluguel com a sua atenção."*
+Takehiko Inoue constrói uma das maiores viradas da história dos quadrinhos não em um campo de batalha, mas na lama de uma plantação de arroz. 
 
-Puxe uma cadeira, sirva um café forte e sinta-se em casa. O terminal está aberto.
+Depois de ceifar setenta homens do clã Yoshioka e quase perder a perna, Musashi é forçado a parar. Ele passa meses arando a terra com as próprias mãos, convivendo com a fome, a seca e o ritmo impiedoso das estações. É nesse silêncio desconfortável que ele compreende o ensinamento do monge Takuan:
+
+> *"A espada não serve para cortar o outro, mas para podar o seu próprio ego. O infinito não está no horizonte lá fora; infinito é apenas a sua própria mente."*
+
+A força real nunca foi sobre esmagar o oponente. Era sobre a ausência de intenção dividida — a capacidade de estar inteiro no momento presente, sem a ansiedade febril de validação externa.
+
+---
+
+### 2. A Lição de Guts: O Lutador que Aprendeu a Guardar a Fúria
+
+Se Musashi nos ensina a podar a arrogância, Kentaro Miura nos legou um tratado sobre o que significa resistir com dignidade.
+
+Guts carrega um trauma que destruiria qualquer psique humana. Durante muito tempo, a fúria foi o único combustível que o manteve vivo. Mas o momento em que *Berserk* atinge sua maturidade sublime é quando Guts percebe que **odiar consome a mesma energia vital que amar**. Ele decide parar de caçar a vingança para proteger a Casca e as pessoas que escolheram caminhar ao seu lado.
+
+O "Struggler" não é aquele que grita contra a tempestade; é aquele que, mesmo ferido e no breu da madrugada, continua acendendo uma fogueira silenciosa para manter os seus aquecidos.
+
+---
+
+### 3. O Silêncio Como Trincheira Digital
+
+No desenvolvimento de software e na vida real, vivemos cercados por uma febre coletiva. Tudo precisa ser imediato, tudo precisa ser compartilhado, todo mundo quer ser "Fullstack Sênior" em seis meses e postar métricas de vaidade no LinkedIn antes do café da manhã.
+
+Mas o trabalho de verdade — o código limpo que roda por anos sem falhar, a escrita autêntica, a paz mental ao deitar — **só floresce no silêncio**.
+
+Três regras que levo para o terminal e para a vida:
+- **Respire antes de reagir:** A maioria das crises do dia a dia morre por inanição quando você se recusa a entrar em pânico.
+- **Podar o supérfluo:** Menos bibliotecas de 500MB, menos reuniões desnecessárias, menos ruído. Domine o essencial.
+- **Construa seu refúgio:** Se você não cultiva um espaço de silêncio na sua mente e no seu dia, você será eternamente refém do algoritmo do próximo.
+
+Puxe a respiração fundo. Desconecte o ruído. O verdadeiro duelo sempre foi contra a nossa própria pressa.
 """,
-                    created_at=datetime.now()
-                ),
-                Post(
-                    title="Vagabond, Berserk e a Busca pelo Silêncio Interior",
-                    slug="vagabond-berserk-e-a-busca-pelo-silencio-interior",
-                    category="Mangás & Cultura",
-                    media_url="https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=1200&auto=format&fit=crop",
-                    views_count=89,
-                    content="""# Entre a Espada e a Serenidade
-
-Ler *Vagabond* aos 20 anos é uma experiência sobre querer ser o mais forte do mundo. Ler aos 28 é sobre entender que **"infinito é apenas a sua própria mente"**.
-
-Takehiko Inoue e Kentaro Miura nos deixaram mais do que histórias de batalhas sangrentas: deixaram manuais sobre resiliência humana. Guts nos ensina a resistir mesmo quando o destino conspira contra nós, enquanto Musashi Miyamoto nos conduz pela dolorosa jornada de desaprender a arrogância.
-
-### Lições para o Mundo Dev e a Vida Real:
-- **A espada não serve para cortar o outro, mas para cortar as próprias ilusões.**
-- **O foco não é a ausência de distrações, é a clareza inabalável do próximo passo.**
-- **A maestria leva tempo.** Não existe "Fullstack Sênior em 6 meses" no tatame da vida.
-
-Numa época onde tudo é instantâneo e descartável, parar para contemplar o traço a nanquim de uma página dupla é um ato revolucionário de calma.
-""",
-                    created_at=datetime.now()
-                ),
-                Post(
-                    title="Por que Monólitos em SQLite e FastAPI Ainda Dominam o Mundo Real",
-                    slug="monolitos-sqlite-fastapi-dominam-o-mundo-real",
-                    category="Dev & Tech",
-                    media_url="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=1200&auto=format&fit=crop",
-                    views_count=215,
-                    content="""# Menos Microserviços, Mais Código Entregue
-
-Parece que a indústria de software sofre de uma febre coletiva: qualquer sistema que poderia rodar num Raspberry Pi de 2GB é fatiado em 14 microserviços, orquestrado por um cluster de Kubernetes que custa o salário anual de três estagiários.
-
-Para projetos independentes, ferramentas internas e blogs autorais, a combinação **FastAPI + SQLite + Jinja2** é quase imbatível:
-
-- **Zero Latência de Rede:** As queries do SQLite rodam no mesmo processo em disco local ou NVMe.
-- **Backups Atômicos:** Quer fazer backup do banco de produção? `cp blog.db blog.db.bak`. Fim.
-- **Tipagem Forte e DX:** FastAPI oferece serialização com Pydantic e async nativo sem mágica obscura.
-- **FinOps Imbatível:** Roda em qualquer VPS de 4 dólares por mês sem suar.
-
-Antes de adicionar mais uma fila no RabbitMQ, pergunte-se: *você precisa de escala planetária ou você só quer que seu sistema funcione sem te acordar às 3 da manhã?*
-""",
-                    created_at=datetime.now()
-                )
-            ]
-
-            db.add_all(posts_seed)
+                created_at=datetime.now()
+            )
+            db.add(post_seed)
             db.commit()
+            logger.info("[SEED] Post inaugural 'Vagabond, Berserk e a Busca pelo Silêncio Interior' inserido.")
 
-            # Adiciona comentários de exemplo no primeiro post
-            first_post = db.query(Post).filter(Post.slug == "manifesto-do-refugio-trincheiras-era-dos-algoritmos").first()
-            if first_post:
-                comments_seed = [
-                    Comment(
-                        post_id=first_post.id,
-                        author_name="Kenshin_01",
-                        author_email="kenshin@retro.net",
-                        content="Sensacional a iniciativa! A web dos anos 2000 faz muita falta. Já adicionei o feed no meu leitor RSS.",
-                        notify_replies=True,
-                        created_at=datetime.now()
-                    ),
-                    Comment(
-                        post_id=first_post.id,
-                        author_name="Luna Cyberpunk",
-                        author_email="luna@matrix.io",
-                        content="Essa estética Neo-Brutalista com verde terminal ficou absurda de linda. Parabéns pelo Refúgio!",
-                        notify_replies=False,
-                        created_at=datetime.now()
-                    )
-                ]
-                db.add_all(comments_seed)
-                db.commit()
-
-            logger.info("[SEED] 3 posts inaugurais e comentários de exemplo injetados com sucesso.")
-
-        # 4. Submissões Comunitárias no Lab
+        # 4. Projeto Comunitário no Lab: Emulador Nintendo 64 (RMG)
         lab_count = db.query(CommunitySubmission).count()
         if lab_count == 0:
-            lab_seed = [
-                CommunitySubmission(
-                    author_name="RetroDev",
-                    author_email="retro@pixel.games",
-                    github_link="https://github.com/topics/roguelike-python",
-                    title="Dungeon Crawler 16-bits",
-                    category="Jogos 2D",
-                    description="Mini roguelike procedural desenvolvido em Python com curses e suporte a paletas retrô do GameBoy.",
-                    image_url="https://images.unsplash.com/photo-1551103782-8ab07afd45c1?q=80&w=800&auto=format&fit=crop",
-                    status="approved",
-                    clicks_count=67,
-                    created_at=datetime.now()
-                ),
-                CommunitySubmission(
-                    author_name="Kaizen",
-                    author_email="kaizen@terminal.tools",
-                    github_link="https://github.com/topics/cli-productivity",
-                    title="Chrono-Tracker CLI",
-                    category="Scripts Úteis",
-                    description="Cronômetro Pomodoro embutido diretamente na barra de status do terminal, com estatísticas diárias exportadas em JSON.",
-                    image_url="https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop",
-                    status="approved",
-                    clicks_count=42,
-                    created_at=datetime.now()
-                ),
-                CommunitySubmission(
-                    author_name="SamuraiSound",
-                    author_email="beats@cyber.fm",
-                    github_link="https://github.com/topics/lofi-radio",
-                    title="Lo-Fi Beats Terminal Radio",
-                    category="Ferramentas de IA",
-                    description="Streamer de áudio leve via MPV integrado ao terminal, tocando playlists lo-fi 24/7 sem consumir sua RAM.",
-                    image_url="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=800&auto=format&fit=crop",
-                    status="approved",
-                    clicks_count=35,
-                    created_at=datetime.now()
-                ),
-                CommunitySubmission(
-                    author_name="CyberVoxel",
-                    author_email="voxel@canvas.art",
-                    github_link="https://github.com/topics/webgl-shaders",
-                    title="Pixel-Shader Playground",
-                    category="Ferramentas de IA",
-                    description="Simulador interativo de shaders GLSL que converte imagens e vídeos para estilo pixel art dos consoles dos anos 90.",
-                    image_url="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop",
-                    status="approved",
-                    clicks_count=28,
-                    created_at=datetime.now()
-                ),
-                CommunitySubmission(
-                    author_name="Dixie",
-                    author_email="dixie@refugio.local",
-                    github_link="https://github.com/topics/rss-reader",
-                    title="IndieWeb RSS Aggregator",
-                    category="Scripts Úteis",
-                    description="Leitor e agregador de feeds RSS ultrarrápido com cache SQLite local e exportação em Markdown puro.",
-                    image_url="https://images.unsplash.com/photo-1504639725590-34d0984388bd?q=80&w=800&auto=format&fit=crop",
-                    status="approved",
-                    clicks_count=19,
-                    created_at=datetime.now()
-                )
-            ]
-            db.add_all(lab_seed)
+            lab_seed = CommunitySubmission(
+                author_name="Rosalie241",
+                author_email="rosalie@rmg.emu",
+                github_link="https://github.com/Rosalie241/RMG",
+                title="RMG // Rosalie's Mupen GUI (N64 Emulator)",
+                category="Jogos 2D",
+                description="Emulador open-source de alta fidelidade para Nintendo 64 desenvolvido em C++/Qt6, baseado no Mupen64Plus com plugins gráficos modernos (GLideN64 e ParaLLEl-RDP) e suporte completo a netplay.",
+                image_url="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop",
+                status="approved",
+                clicks_count=0,
+                created_at=datetime.now()
+            )
+            db.add(lab_seed)
             db.commit()
-            logger.info("[SEED] 5 projetos aprovados da comunidade no Lab injetados com sucesso.")
+            logger.info("[SEED] Projeto 'RMG (N64 Emulator)' inserido no Lab.")
 
     except Exception as e:
         db.rollback()
@@ -212,6 +119,36 @@ Antes de adicionar mais uma fila no RabbitMQ, pergunte-se: *você precisa de esc
         raise e
     finally:
         db.close()
+
+
+def reset_to_clean_state():
+    """Limpa contadores, posts de teste e dados fake, deixando o banco no estado zero."""
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        # Zera visitas
+        visit_stat = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
+        if visit_stat:
+            visit_stat.value = 0
+        else:
+            db.add(SiteStat(key="total_visits", value=0))
+
+        # Limpa comentários e posts antigos
+        db.query(Comment).delete()
+        db.query(Post).delete()
+        db.query(CommunitySubmission).delete()
+        db.commit()
+
+        logger.info("[RESET] Dados antigos, fakes e contadores limpos com sucesso.")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[RESET ERROR] Falha ao limpar banco: {e}")
+        raise e
+    finally:
+        db.close()
+
+    # Reaplica os dados limpos
+    init_database()
 
 
 if __name__ == "__main__":
