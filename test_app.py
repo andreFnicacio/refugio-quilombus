@@ -155,12 +155,19 @@ def test_lab_click_redirect(client):
     db.close()
 
 
-def test_rss_feed(client):
-    resp = client.get("/rss")
-    assert resp.status_code == 200
-    assert "application/xml" in resp.headers["content-type"]
-    assert "<rss version=\"2.0\"" in resp.text
-    assert "<title>O Refúgio</title>" in resp.text
+def test_rss_feed_removed_and_clean_footer(client):
+    # Garante que as rotas de RSS foram desativadas e retornam 404
+    resp_rss = client.get("/rss")
+    assert resp_rss.status_code == 404
+
+    resp_feed = client.get("/feed.xml")
+    assert resp_feed.status_code == 404
+
+    # Garante que o rodapé não contém mais o botão [FEED RSS] nem tag de link no head
+    resp_home = client.get("/")
+    assert "[FEED RSS]" not in resp_home.text
+    assert 'href="/rss"' not in resp_home.text
+
 
 
 def test_about_page(client):

@@ -199,7 +199,7 @@ pytest -v test_app.py
 ```
 
 ### O que é coberto pelos testes:
-- **Rotas Públicas e Renderização**: Validação de status 200 e integridade de conteúdo na Home (`/`), Sobre (`/about`), Lab (`/lab`), Post (`/post/{slug}`) e RSS Feed (`/feed.xml`).
+- **Rotas Públicas e Renderização**: Validação de status 200 e integridade de conteúdo na Home (`/`), Sobre (`/about`), Lab (`/lab`) e Post individual (`/post/{slug}`).
 - **Segurança & Anti-XSS**: Sanitização de scripts maliciosos injetados via Markdown ou nomes de projetos com `bleach`.
 - **Prevenção de DoS (Rate Limiting)**: Disparo massivo de requisições para validação do bloqueio HTTP 429 via `slowapi`.
 - **Validação de Uploads (Magic Bytes)**: Bloqueio imediato de arquivos maliciosos renomeados (ex: `.exe` ou scripts disfarçados de `.png`).

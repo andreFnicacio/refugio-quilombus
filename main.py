@@ -521,42 +521,6 @@ def about(request: Request, db: Session = Depends(get_db)):
     )
 
 
-# --- RSS FEED (INDIEWEB COMPLIANT) ---
-
-@app.get("/feed.xml")
-@app.get("/rss")
-def rss_feed(db: Session = Depends(get_db)):
-    posts = db.query(Post).order_by(Post.created_at.desc()).limit(20).all()
-    items_xml = []
-    for p in posts:
-        pub_date = p.created_at.strftime("%a, %d %b %Y %H:%M:%S GMT")
-        post_url = f"{settings.BASE_URL}/post/{p.slug}"
-        items_xml.append(f"""
-        <item>
-            <title><![CDATA[{p.title}]]></title>
-            <link>{post_url}</link>
-            <guid>{post_url}</guid>
-            <pubDate>{pub_date}</pubDate>
-            <category><![CDATA[{p.category}]]></category>
-            <description><![CDATA[{p.content[:300]}...]]></description>
-        </item>
-        """)
-
-    feed = f"""<?xml version="1.0" encoding="UTF-8" ?>
-    <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-    <channel>
-        <title>{settings.APP_NAME}</title>
-        <link>{settings.BASE_URL}</link>
-        <description>Indie Blog &amp; Community Hub na estética Neo-Brutalist</description>
-        <language>pt-br</language>
-        <atom:link href="{settings.BASE_URL}/feed.xml" rel="self" type="application/rss+xml" />
-        {''.join(items_xml)}
-    </channel>
-    </rss>
-    """
-    return Response(content=feed, media_type="application/xml")
-
-
 # --- AUTENTICAÇÃO ---
 
 @app.get("/login", response_class=HTMLResponse)
