@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Radar de Notícias // O Refúgio{% endblock %}
+
+{% block content %}
+  <section class="page-intro" style="margin-bottom: 30px;">
+    <div class="card-brutalist" style="border-color: var(--border-green);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div>
+          <span style="font-family: var(--font-pixel); font-size: 0.9rem; color: var(--border-green);">
+            [PROTOCOLO: RADAR DINÂMICO // INDIEWEB HUB]
+          </span>
+          <h1 style="font-family: var(--font-mono); font-size: 1.4rem; color: #ffffff; margin-top: 8px;">
+            RADAR DE NOTÍCIAS EXTERNAS
+          </h1>
+          <p style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--text-dim); margin-top: 6px; max-width: 780px;">
+            Transmissões abertas sobre Cultura Nerd, Tecnologia e Política. Não reproduzimos o conteúdo aqui — servimos como trincheira e ponte direta para os veículos originais.
+          </p>
+        </div>
+        <div style="text-align: right;">
+          <span class="badge-cat" style="margin: 0; background: rgba(0, 255, 102, 0.1); border-color: var(--border-green); color: var(--border-green);">
+            TOP 5 DE CADA CATEGORIA
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Categorias em 3 Colunas Neo-Brutalistas -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 40px;">
+
+    <!-- 1. CULTURA NERD & GEEK -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="background: #0d1612; border: 2px solid var(--border-green); padding: 12px 16px; box-shadow: 4px 4px 0 var(--border-green); display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-family: var(--font-pixel); font-size: 1rem; color: var(--border-green); margin: 0;">
+          [01. NERD &amp; CULTURA]
+        </h2>
+        <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">TOP 5</span>
+      </div>
+
+      {% for item in news.nerd %}
+        <article class="card-brutalist" style="border-color: var(--border-green); display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+          <div>
+            {% if item.image_url %}
+              <div style="overflow: hidden; border: 2px solid #1a2920; margin-bottom: 12px; max-height: 160px; background: #000;">
+                <img src="{{ item.image_url }}" alt="{{ item.title }}" style="width: 100%; height: 160px; object-fit: cover; display: block; filter: saturate(0.9) contrast(1.1);" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=800&auto=format&fit=crop';">
+              </div>
+            {% endif %}
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span class="badge-cat" style="margin: 0; font-size: 0.7rem; border-color: var(--border-green); color: var(--border-green);">
+                {{ item.source }}
+              </span>
+              <small style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">
+                {{ item.published_at }}
+              </small>
+            </div>
+
+            <h3 style="font-family: var(--font-mono); font-size: 0.95rem; line-height: 1.4; color: #ffffff; margin-bottom: 12px;">
+              {{ item.title }}
+            </h3>
+          </div>
+
+          <div style="margin-top: 10px; border-top: 1px dashed #203527; padding-top: 10px;">
+            <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer" class="btn" style="width: 100%; justify-content: center; font-size: 0.8rem; padding: 6px 12px;">
+              ACESSAR MATÉRIA ORIGINAL &gt;&gt;
+            </a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+
+    <!-- 2. TECNOLOGIA & DEV -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="background: #0d161a; border: 2px solid var(--border-cyan); padding: 12px 16px; box-shadow: 4px 4px 0 var(--border-cyan); display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-family: var(--font-pixel); font-size: 1rem; color: var(--border-cyan); margin: 0;">
+          [02. TECNOLOGIA]
+        </h2>
+        <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">TOP 5</span>
+      </div>
+
+      {% for item in news.tech %}
+        <article class="card-brutalist" style="border-color: var(--border-cyan); display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+          <div>
+            {% if item.image_url %}
+              <div style="overflow: hidden; border: 2px solid #142a33; margin-bottom: 12px; max-height: 160px; background: #000;">
+                <img src="{{ item.image_url }}" alt="{{ item.title }}" style="width: 100%; height: 160px; object-fit: cover; display: block; filter: saturate(0.9) contrast(1.1);" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop';">
+              </div>
+            {% endif %}
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span class="badge-cat" style="margin: 0; font-size: 0.7rem; border-color: var(--border-cyan); color: var(--border-cyan);">
+                {{ item.source }}
+              </span>
+              <small style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">
+                {{ item.published_at }}
+              </small>
+            </div>
+
+            <h3 style="font-family: var(--font-mono); font-size: 0.95rem; line-height: 1.4; color: #ffffff; margin-bottom: 12px;">
+              {{ item.title }}
+            </h3>
+          </div>
+
+          <div style="margin-top: 10px; border-top: 1px dashed #143542; padding-top: 10px;">
+            <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer" class="btn btn-cyan" style="width: 100%; justify-content: center; font-size: 0.8rem; padding: 6px 12px;">
+              ACESSAR MATÉRIA ORIGINAL &gt;&gt;
+            </a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+
+    <!-- 3. POLÍTICA & SOCIEDADE -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="background: #1a160d; border: 2px solid var(--border-amber); padding: 12px 16px; box-shadow: 4px 4px 0 var(--border-amber); display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-family: var(--font-pixel); font-size: 1rem; color: var(--border-amber); margin: 0;">
+          [03. POLÍTICA]
+        </h2>
+        <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">TOP 5</span>
+      </div>
+
+      {% for item in news.politics %}
+        <article class="card-brutalist" style="border-color: var(--border-amber); display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+          <div>
+            {% if item.image_url %}
+              <div style="overflow: hidden; border: 2px solid #332714; margin-bottom: 12px; max-height: 160px; background: #000;">
+                <img src="{{ item.image_url }}" alt="{{ item.title }}" style="width: 100%; height: 160px; object-fit: cover; display: block; filter: saturate(0.9) contrast(1.1);" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1541872703-74c5e44368f9?q=80&w=800&auto=format&fit=crop';">
+              </div>
+            {% endif %}
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span class="badge-cat" style="margin: 0; font-size: 0.7rem; border-color: var(--border-amber); color: var(--border-amber);">
+                {{ item.source }}
+              </span>
+              <small style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">
+                {{ item.published_at }}
+              </small>
+            </div>
+
+            <h3 style="font-family: var(--font-mono); font-size: 0.95rem; line-height: 1.4; color: #ffffff; margin-bottom: 12px;">
+              {{ item.title }}
+            </h3>
+          </div>
+
+          <div style="margin-top: 10px; border-top: 1px dashed #403014; padding-top: 10px;">
+            <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer" class="btn btn-amber" style="width: 100%; justify-content: center; font-size: 0.8rem; padding: 6px 12px;">
+              ACESSAR MATÉRIA ORIGINAL &gt;&gt;
+            </a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+
+  </div>
+{% endblock %}

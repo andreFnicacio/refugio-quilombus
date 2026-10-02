@@ -36,8 +36,8 @@ def create_session_token(username: str) -> str:
     return serializer.dumps({"sub": username})
 
 
-def verify_session_token(token: str, max_age: int = 60 * 60 * 24 * 7) -> Optional[str]:
-    """Valida token com validade padrão de 7 dias."""
+def verify_session_token(token: str, max_age: int = 60 * 60 * 2) -> Optional[str]:
+    """Valida token assinado com tempo máximo de inatividade (padrão 2 horas)."""
     try:
         data = serializer.loads(token, max_age=max_age)
         return data.get("sub")

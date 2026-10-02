@@ -12,13 +12,6 @@ class Settings(BaseSettings):
 
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "refugio2026!"
-    ADMIN_EMAIL: str = "admin@refugio.local"
-
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_FROM_NAME: str = "O Refúgio Bot"
 
     SESSION_COOKIE_NAME: str = "refugio_session"
     MAX_UPLOAD_SIZE_MB: int = 5

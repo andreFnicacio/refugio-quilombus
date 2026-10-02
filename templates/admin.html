@@ -61,6 +61,9 @@
     <button type="button" class="tab-btn {% if active_tab == 'comments' %}active{% endif %}" data-tab="comments">
       [03. COMENTÁRIOS ({{ comments|length }})]
     </button>
+    <button type="button" class="tab-btn {% if active_tab == 'operators' %}active{% endif %}" data-tab="operators">
+      [04. OPERADORES ({{ operators|length }})]
+    </button>
   </div>
 
   <!-- TAB 1: POSTS LIST -->
@@ -310,6 +313,95 @@
           Nenhum comentário cadastrado ainda.
         </p>
       {% endif %}
+    </div>
+  </div>
+
+  <!-- TAB 5: OPERADORES -->
+  <div class="tab-pane" id="tab-operators" style="display: {% if active_tab == 'operators' %}block{% else %}none{% endif %};">
+    <!-- Formulário de Recrutamento de Novo Operador -->
+    <div class="card-brutalist" style="border-color: var(--border-green); margin-bottom: 30px;">
+      <h3 style="font-family: var(--font-mono); color: var(--border-green); margin-bottom: 20px;">
+        [+] REGISTRAR NOVO OPERADOR DO MONÓLITO
+      </h3>
+      <p style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-dim); margin-bottom: 20px;">
+        Cadastre credenciais para amigos ou novos operadores. Todos os operadores registrados possuem acesso de moderação e publicação.
+      </p>
+
+      <form action="/admin/operators/new" method="POST" style="max-width: 650px;">
+        <div class="form-group">
+          <label class="form-label" for="op_username">Identificador (Nome de Usuário) *</label>
+          <input type="text" id="op_username" name="username" class="form-input" placeholder="Ex: cyber_samurai" required minlength="3" maxlength="30" pattern="[a-zA-Z0-9_-]+">
+          <small style="font-family: var(--font-mono); color: var(--text-muted); font-size: 0.75rem;">Apenas letras, números, hífen e underline (mínimo 3 caracteres).</small>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+          <div class="form-group">
+            <label class="form-label" for="op_password">Código de Acesso (Senha) *</label>
+            <input type="password" id="op_password" name="password" class="form-input" placeholder="••••••••" required minlength="6">
+            <small style="font-family: var(--font-mono); color: var(--text-muted); font-size: 0.75rem;">Mínimo de 6 caracteres.</small>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="op_confirm_password">Confirmar Código de Acesso *</label>
+            <input type="password" id="op_confirm_password" name="confirm_password" class="form-input" placeholder="••••••••" required minlength="6">
+          </div>
+        </div>
+
+        <button type="submit" class="btn" style="margin-top: 10px;">
+          CADASTRAR OPERADOR &gt;&gt;
+        </button>
+      </form>
+    </div>
+
+    <!-- Tabela de Operadores Ativos -->
+    <div class="card-brutalist">
+      <h3 style="font-family: var(--font-mono); color: var(--border-amber); margin-bottom: 20px;">
+        OPERADORES ATIVOS COM ACESSO AO TERMINAL ({{ operators|length }})
+      </h3>
+
+      <div style="overflow-x: auto;">
+        <table class="table-brutalist">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Identificador</th>
+              <th>Status</th>
+              <th>Ingresso no Sistema</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for op in operators %}
+              <tr>
+                <td>#{{ op.id }}</td>
+                <td>
+                  <strong>{{ op.username }}</strong>
+                  {% if op.id == admin_user.id %}
+                    <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--border-green); margin-left: 6px;">[VOCÊ]</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge-cat" style="margin: 0; border-color: var(--border-green); color: var(--border-green);">OPERADOR ATIVO</span>
+                </td>
+                <td>{{ op.created_at|format_datetime }}</td>
+                <td>
+                  {% if op.id == admin_user.id %}
+                    <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">[SESSÃO ATUAL]</span>
+                  {% elif operators|length <= 1 %}
+                    <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">[ÚNICO OPERADOR]</span>
+                  {% else %}
+                    <form action="/admin/operators/{{ op.id }}/delete" method="POST" style="display: inline;" onsubmit="return confirm('Deseja realmente revogar o acesso do operador {{ op.username }}?');">
+                      <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">
+                        REVOGAR ACESSO
+                      </button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 {% endblock %}

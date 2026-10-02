@@ -31,21 +31,19 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from config import settings
-from database import get_db, SessionLocal
+from database import get_db, SessionLocal, engine
 from models import User, Post, CommunitySubmission, Comment, SiteStat
 from auth import (
     require_admin,
     get_current_user_optional,
     verify_password,
+    hash_password,
     create_session_token,
     validate_image_file,
     generate_safe_filename
 )
 from init_db import init_database
-from email_service import (
-    notify_new_comment_in_background,
-    notify_admin_new_submission_in_background
-)
+from news_service import get_news_hub_data
 
 
 # Rate Limiter em memória (FinOps: zero overhead de Redis para instâncias locais/leves)
@@ -57,6 +55,12 @@ async def lifespan(app: FastAPI):
     # Inicialização automática do banco e seed anti-tela pelada
     init_database()
     yield
+    # Checkpoint de saída para consolidar WAL no arquivo blog.db antes de reiniciar container
+    try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE);")
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -211,7 +215,7 @@ templates.env.globals["base_url"] = settings.BASE_URL
 def get_site_visits(db: Session) -> int:
     stat = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
     if not stat:
-        stat = SiteStat(key="total_visits", value=1337)
+        stat = SiteStat(key="total_visits", value=0)
         db.add(stat)
         db.commit()
     return stat.value
@@ -220,7 +224,7 @@ def get_site_visits(db: Session) -> int:
 def increment_site_visits(db: Session) -> int:
     stat = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
     if not stat:
-        stat = SiteStat(key="total_visits", value=1337)
+        stat = SiteStat(key="total_visits", value=0)
         db.add(stat)
     else:
         stat.value += 1
@@ -309,11 +313,10 @@ def post_detail(
 def create_comment(
     request: Request,
     slug: str,
-    background_tasks: BackgroundTasks,
     author_name: str = Form(...),
     author_email: str = Form(...),
     content: str = Form(...),
-    notify_replies: bool = Form(False),
+    notify_replies: Optional[bool] = Form(False),
     website_hp: Optional[str] = Form(None),  # Honeypot anti-spam
     db: Session = Depends(get_db)
 ):
@@ -336,39 +339,16 @@ def create_comment(
             status_code=status.HTTP_303_SEE_OTHER
         )
 
-    # Identifica emails de pessoas que solicitaram notificação para este post
-    subscriber_emails = [
-        c.author_email for c in post.comments
-        if c.notify_replies and c.author_email and c.author_email != author_email
-    ]
-    # Inclui o e-mail do admin para notificação se configurado e não for o autor do comentário
-    if settings.ADMIN_EMAIL and settings.ADMIN_EMAIL != author_email:
-        subscriber_emails.append(settings.ADMIN_EMAIL)
-
-    # Remove duplicados
-    subscriber_emails = list(set(subscriber_emails))
-
     comment = Comment(
         post_id=post.id,
         author_name=author_name,
         author_email=author_email,
         content=content,
-        notify_replies=notify_replies,
+        notify_replies=False,
         created_at=datetime.now()
     )
     db.add(comment)
     db.commit()
-
-    # Dispara e-mail em background se houver inscritos
-    if subscriber_emails:
-        background_tasks.add_task(
-            notify_new_comment_in_background,
-            post_title=post.title,
-            post_slug=post.slug,
-            comment_author=author_name,
-            comment_content=content,
-            recipient_emails=subscriber_emails
-        )
 
     return RedirectResponse(
         url=f"/post/{slug}?msg=Comentario+publicado+com+sucesso#comments",
@@ -428,7 +408,6 @@ def community_lab(
 @limiter.limit("5/minute")
 def submit_lab_project(
     request: Request,
-    background_tasks: BackgroundTasks,
     author_name: str = Form(...),
     author_email: str = Form(...),
     github_link: str = Form(...),
@@ -471,15 +450,6 @@ def submit_lab_project(
     )
     db.add(sub)
     db.commit()
-
-    # Dispara e-mail de alerta para o admin avaliar
-    background_tasks.add_task(
-        notify_admin_new_submission_in_background,
-        submission_title=sub.title,
-        author_name=sub.author_name,
-        github_link=sub.github_link,
-        category=sub.category
-    )
 
     return RedirectResponse(url="/lab?submitted=true", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -570,7 +540,7 @@ def login_post(
             status_code=status.HTTP_401_UNAUTHORIZED
         )
 
-    # Cria sessão com cookie assinado
+    # Cria sessão com cookie assinado efêmero (Session Cookie puro)
     token = create_session_token(user.username)
     target = next if (next and next.startswith("/")) else "/admin"
     response = RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
@@ -578,7 +548,8 @@ def login_post(
         key=settings.SESSION_COOKIE_NAME,
         value=token,
         httponly=True,
-        max_age=60 * 60 * 24 * 7,  # 7 dias
+        max_age=None,  # Session cookie puro: morre ao fechar o navegador/aba
+        expires=None,
         samesite="lax",
         secure=False  # True em prod com HTTPS
     )
@@ -640,6 +611,7 @@ def admin_dashboard(
         .all()
     )
     recent_comments = db.query(Comment).order_by(Comment.created_at.desc()).limit(30).all()
+    operators = db.query(User).order_by(User.created_at.asc()).all()
 
     # Categorias consolidadas para o dropdown de criação de posts
     available_categories = get_available_post_categories(db)
@@ -666,6 +638,7 @@ def admin_dashboard(
             "approved_submissions": approved_submissions,
             "rejected_submissions": rejected_submissions,
             "comments": recent_comments,
+            "operators": operators,
             "stats": stats,
             "active_tab": tab,
             "total_visits": visits,
@@ -878,3 +851,115 @@ def admin_delete_comment(
         url="/admin?tab=comments&msg=Comentario+removido",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+
+@app.post("/admin/operators/new")
+def admin_create_operator(
+    username: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    clean_username = clean_plain_text(username).strip()
+    if not clean_username or len(clean_username) < 3 or len(clean_username) > 30:
+        return RedirectResponse(
+            url="/admin?tab=operators&msg=Nome+de+usuario+invalido.+Deve+ter+entre+3+e+30+caracteres.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    if not re.match(r"^[a-zA-Z0-9_-]+$", clean_username):
+        return RedirectResponse(
+            url="/admin?tab=operators&msg=Nome+de+usuario+deve+conter+apenas+letras,+numeros,+hifen+ou+underline.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    if len(password) < 6:
+        return RedirectResponse(
+            url="/admin?tab=operators&msg=A+senha+deve+possuir+no+minimo+6+caracteres.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    if password != confirm_password:
+        return RedirectResponse(
+            url="/admin?tab=operators&msg=As+senhas+informadas+nao+conferem.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    existing = db.query(User).filter(User.username == clean_username).first()
+    if existing:
+        return RedirectResponse(
+            url=f"/admin?tab=operators&msg=O+identificador+'{clean_username}'+ja+esta+em+uso+no+sistema.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    new_operator = User(
+        username=clean_username,
+        password_hash=hash_password(password),
+        created_at=datetime.now()
+    )
+    db.add(new_operator)
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin?tab=operators&msg=Novo+operador+'{clean_username}'+forjado+com+sucesso!",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@app.post("/admin/operators/{user_id}/delete")
+def admin_delete_operator(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    if admin_user.id == user_id:
+        return RedirectResponse(
+            url="/admin?tab=operators&msg=Acao+bloqueada:+voce+nao+pode+revogar+o+proprio+acesso.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    total_operators = db.query(User).count()
+    if total_operators <= 1:
+        return RedirectResponse(
+            url="/admin?tab=operators&msg=Acao+bloqueada:+o+sistema+precisa+manter+ao+menos+um+operador+ativo.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    op_to_delete = db.query(User).filter(User.id == user_id).first()
+    if op_to_delete:
+        target_name = op_to_delete.username
+        db.delete(op_to_delete)
+        db.commit()
+        return RedirectResponse(
+            url=f"/admin?tab=operators&msg=Acesso+do+operador+'{target_name}'+revogado+com+sucesso.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    return RedirectResponse(
+        url="/admin?tab=operators&msg=Operador+nao+encontrado.",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+# --- HUB DINÂMICO DE NOTÍCIAS (RADAR) ---
+
+@app.get("/radar", response_class=HTMLResponse)
+def news_radar(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = get_current_user_optional(request, db)
+    visits = increment_site_visits(db)
+    news_data = get_news_hub_data()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="radar.html",
+        context={
+            "news": news_data,
+            "total_visits": visits,
+            "current_user": current_user
+        }
+    )
+

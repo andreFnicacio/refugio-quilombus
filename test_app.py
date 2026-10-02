@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from main import app
 from database import SessionLocal
-from models import Post, CommunitySubmission, Comment, SiteStat
+from models import User, Post, CommunitySubmission, Comment, SiteStat
 from config import settings
 
 
@@ -302,14 +302,18 @@ def test_magic_bytes_image_validation():
 
 
 def test_rate_limiting_protection(client):
-    # Faz requisições consecutivas no login para estourar o limite de 5/minuto
-    exceeded = False
-    for _ in range(8):
-        resp = client.post("/login", data={"username": "fake", "password": "wrong"})
-        if resp.status_code == 429:
-            exceeded = True
-            break
-    assert exceeded
+    from main import limiter
+    try:
+        # Faz requisições consecutivas no login para estourar o limite de 5/minuto
+        exceeded = False
+        for _ in range(8):
+            resp = client.post("/login", data={"username": "fake", "password": "wrong"})
+            if resp.status_code == 429:
+                exceeded = True
+                break
+        assert exceeded
+    finally:
+        limiter._limiter.storage.reset()
 
 
 def test_category_filter_with_ampersand(client):
@@ -455,6 +459,162 @@ def test_admin_category_dropdown_and_custom_creation(client):
         db.delete(p)
         db.commit()
     db.close()
+
+
+def test_ephemeral_session_cookie(client):
+    # Faz login e verifica se o cookie retornado é do tipo sessão (sem Max-Age fixo no Set-Cookie)
+    resp = client.post(
+        "/login",
+        data={"username": settings.ADMIN_USERNAME, "password": settings.ADMIN_PASSWORD},
+        follow_redirects=False
+    )
+    assert resp.status_code == 303
+    set_cookie_header = resp.headers.get("set-cookie", "")
+    assert settings.SESSION_COOKIE_NAME in set_cookie_header
+    # Garante que o cookie NÃO possui max-age de 7 dias persistente (604800)
+    assert "max-age=604800" not in set_cookie_header.lower()
+    assert "Max-Age=" not in set_cookie_header
+
+
+def test_operators_management_flow(client):
+    import uuid
+    from auth import create_session_token
+    token = create_session_token(settings.ADMIN_USERNAME)
+    cookies = {settings.SESSION_COOKIE_NAME: token}
+
+    unique_user = f"amigo_{uuid.uuid4().hex[:6]}"
+    unique_pass = "segredo123"
+
+    # 1. Carrega aba de operadores
+    resp_tab = client.get("/admin?tab=operators", cookies=cookies)
+    assert resp_tab.status_code == 200
+    assert "REGISTRAR NOVO OPERADOR" in resp_tab.text
+    assert "OPERADORES ATIVOS" in resp_tab.text
+
+    # 2. Cadastro com senhas divergentes (deve falhar com redirect e mensagem)
+    bad_data = {
+        "username": unique_user,
+        "password": unique_pass,
+        "confirm_password": "outrasenhadiferente"
+    }
+    resp_divergent = client.post("/admin/operators/new", data=bad_data, cookies=cookies, follow_redirects=False)
+    assert resp_divergent.status_code == 303
+    assert "nao+conferem" in resp_divergent.headers["location"]
+
+    # 3. Cadastro bem-sucedido de novo operador
+    valid_data = {
+        "username": unique_user,
+        "password": unique_pass,
+        "confirm_password": unique_pass
+    }
+    resp_create = client.post("/admin/operators/new", data=valid_data, cookies=cookies, follow_redirects=False)
+    assert resp_create.status_code == 303
+    assert "forjado+com+sucesso" in resp_create.headers["location"]
+
+    # Verifica no banco se o operador foi inserido
+    db = SessionLocal()
+    new_op = db.query(User).filter(User.username == unique_user).first()
+    assert new_op is not None
+    new_op_id = new_op.id
+    db.close()
+
+    # 4. Tenta cadastrar novamente o mesmo username (duplicidade)
+    resp_dup = client.post("/admin/operators/new", data=valid_data, cookies=cookies, follow_redirects=False)
+    assert resp_dup.status_code == 303
+    assert "ja+esta+em+uso" in resp_dup.headers["location"]
+
+    # 5. O novo operador consegue fazer login e acessar o painel
+    resp_new_login = client.post(
+        "/login",
+        data={"username": unique_user, "password": unique_pass},
+        follow_redirects=False
+    )
+    assert resp_new_login.status_code == 303
+    new_token = resp_new_login.cookies[settings.SESSION_COOKIE_NAME]
+    new_cookies = {settings.SESSION_COOKIE_NAME: new_token}
+
+    resp_new_admin = client.get("/admin", cookies=new_cookies)
+    assert resp_new_admin.status_code == 200
+    assert unique_user in resp_new_admin.text
+
+    # 6. O novo operador NÃO pode deletar a si próprio
+    resp_self_delete = client.post(f"/admin/operators/{new_op_id}/delete", cookies=new_cookies, follow_redirects=False)
+    assert resp_self_delete.status_code == 303
+    assert "nao+pode+revogar+o+proprio+acesso" in resp_self_delete.headers["location"]
+
+    # 7. O operador original revoga o acesso do novo operador
+    resp_delete = client.post(f"/admin/operators/{new_op_id}/delete", cookies=cookies, follow_redirects=False)
+    assert resp_delete.status_code == 303
+    assert "revogado+com+sucesso" in resp_delete.headers["location"]
+
+    db = SessionLocal()
+    deleted_check = db.query(User).filter(User.id == new_op_id).first()
+    assert deleted_check is None
+    db.close()
+
+
+def test_radar_news_hub(client):
+    db = SessionLocal()
+    stat_before = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
+    val_before = stat_before.value if stat_before else 0
+    db.close()
+
+    resp = client.get("/radar")
+    assert resp.status_code == 200
+    assert "RADAR DE NOTÍCIAS EXTERNAS" in resp.text
+    assert "NERD &amp; CULTURA" in resp.text
+    assert "TECNOLOGIA" in resp.text
+    assert "POLÍTICA" in resp.text
+    assert "ACESSAR MATÉRIA ORIGINAL" in resp.text
+    assert 'target="_blank"' in resp.text
+    assert 'rel="noopener noreferrer"' in resp.text
+
+    # Verifica se incrementou o contador global de visitas
+    db = SessionLocal()
+    stat_after = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
+    assert stat_after.value == val_before + 1
+    db.close()
+
+
+def test_comment_submission_without_smtp_dependency(client):
+    db = SessionLocal()
+    post = db.query(Post).first()
+    db.close()
+
+    comment_payload = {
+        "author_name": "TerminalUser",
+        "author_email": "terminal@nostalgic.io",
+        "content": "Comentando sem overhead de servidor SMTP. Rápido e limpo.",
+        "website_hp": ""
+    }
+    resp = client.post(f"/post/{post.slug}/comment", data=comment_payload, follow_redirects=True)
+    assert resp.status_code == 200
+    assert "TerminalUser" in resp.text
+
+
+def test_counters_preservation_on_init_and_lifespan():
+    from init_db import init_database
+    db = SessionLocal()
+    # Garante que temos um valor fixo conhecido
+    visit_stat = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
+    if not visit_stat:
+        visit_stat = SiteStat(key="total_visits", value=42)
+        db.add(visit_stat)
+    else:
+        visit_stat.value = max(visit_stat.value, 42)
+    db.commit()
+    target_value = visit_stat.value
+    db.close()
+
+    # Executa a inicialização do banco (idêntico ao manage.py init ou startup de container)
+    init_database()
+
+    db = SessionLocal()
+    stat_after_init = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
+    assert stat_after_init is not None
+    assert stat_after_init.value == target_value, f"Contador de visitas foi alterado! Esperado {target_value}, obtido {stat_after_init.value}"
+    db.close()
+
 
 
 

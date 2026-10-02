@@ -53,9 +53,12 @@
         <a href="/about" class="nav-btn {% if '/about' in request.url.path %}active{% endif %}">
           [03. O MANIFESTO]
         </a>
+        <a href="/radar" class="nav-btn {% if '/radar' in request.url.path %}active{% endif %}" title="Radar de Notícias Nerd, Tech e Política">
+          [04. RADAR]
+        </a>
         {% if current_user %}
           <a href="/admin" class="nav-btn admin-btn {% if '/admin' in request.url.path %}active{% endif %}">
-            [04. ADMIN]
+            [05. ADMIN]
           </a>
           <a href="/logout" class="nav-btn btn-danger" title="Encerrar sessão">
             [SAIR]

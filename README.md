@@ -91,8 +91,8 @@ refugio-quilombus/
 ├── database.py                      # Conexão com SQLite em modo WAL e SessionLocal
 ├── models.py                        # Modelos SQLAlchemy (Post, User, Project, etc.)
 ├── schemas.py                       # Schemas Pydantic para validação e serialização
-├── auth.py                          # Lógica de sessões, hash bcrypt e magic bytes
-├── email_service.py                 # Envio assíncrono de e-mails transacionais
+├── auth.py                          # Lógica de sessões efêmeras, hash bcrypt e magic bytes
+├── news_service.py                  # Hub dinâmico agregador de notícias RSS com cache em memória
 ├── main.py                          # Aplicação FastAPI, rotas web, APIs e middlewares
 ├── init_db.py                       # Criação de tabelas e injeção de dados de seed
 ├── manage.py                        # CLI interativa para administração e telemetria

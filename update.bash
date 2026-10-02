@@ -165,7 +165,7 @@ fi
 
 # ── 3. VERIFICAÇÃO DE ERROS (Sintaxe e Testes Automatizados) ───────────────
 log "3/7 — Verificando sintaxe e integridade do código"
-$PYTHON -m py_compile main.py models.py database.py auth.py config.py manage.py \
+$PYTHON -m py_compile main.py models.py database.py auth.py config.py manage.py news_service.py \
   || die "Erro de sintaxe Python detectado! Atualização abortada."
 ok "Compilação de bytecode Python aprovada (sem erros de sintaxe)"
 
