@@ -33,10 +33,12 @@ class Post(Base):
     content = Column(Text, nullable=False)
     category = Column(String(100), default="Geral", nullable=False, index=True)
     media_url = Column(String(500), nullable=True)
+    author_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     views_count = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
+    author = relationship("User")
     comments = relationship(
         "Comment",
         back_populates="post",

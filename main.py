@@ -566,7 +566,7 @@ def logout():
 # --- ÁREA ADMINISTRATIVA PROTEGIDA ---
 
 DEFAULT_POST_CATEGORIES = [
-    "Saga dos 28",
+    "Diário de Bordo",
     "Dev & Tech",
     "Mangás & Cultura",
     "IndieWeb & Minimalismo",
@@ -702,6 +702,7 @@ async def admin_create_post(
         category=category,
         media_url=final_media_url,
         views_count=0,
+        author_id=admin_user.id,
         created_at=datetime.now()
     )
     db.add(post)

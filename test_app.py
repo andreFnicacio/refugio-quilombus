@@ -188,7 +188,9 @@ def test_about_page(client):
     resp = client.get("/about")
     assert resp.status_code == 200
     assert "O REFÚGIO: TRINCHEIRAS NA ERA DOS ALGORITMOS" in resp.text
-    assert "A Saga dos 28 Anos" in resp.text
+    assert "O Que é O Refúgio" in resp.text
+    assert "Como se Tornar Operador" in resp.text
+    assert "O Radar" in resp.text
 
 
 def test_admin_authentication_and_dashboard(client):
@@ -220,6 +222,8 @@ def test_admin_authentication_and_dashboard(client):
 
 
 def test_admin_create_post_and_moderate(client):
+    import uuid
+
     # Login para obter cookie
     resp_login = client.post(
         "/login",
@@ -228,9 +232,11 @@ def test_admin_create_post_and_moderate(client):
     )
     cookies = {settings.SESSION_COOKIE_NAME: resp_login.cookies[settings.SESSION_COOKIE_NAME]}
 
-    # Criar novo post
+    # Criar novo post (título único evita colisão com runs anteriores)
+    unique_suffix = uuid.uuid4().hex[:8]
+    post_title = f"Post Criado no Teste Automatizado {unique_suffix}"
     post_data = {
-        "title": "Post Criado no Teste Automatizado",
+        "title": post_title,
         "category": "Dev & Tech",
         "content": "Conteúdo de teste com **Markdown em negrito** e uma lista:\n- Item 1\n- Item 2"
     }
@@ -238,9 +244,12 @@ def test_admin_create_post_and_moderate(client):
     assert resp_post.status_code == 303
 
     db = SessionLocal()
-    new_post = db.query(Post).filter(Post.title == "Post Criado no Teste Automatizado").first()
+    new_post = db.query(Post).filter(Post.title == post_title).first()
     assert new_post is not None
-    assert new_post.slug == "post-criado-no-teste-automatizado"
+    assert new_post.slug.startswith("post-criado-no-teste-automatizado")
+    assert new_post.author_id is not None
+    author_username = new_post.author.username.upper() if new_post.author else None
+    post_slug = new_post.slug
 
     # Aprovar uma submissão pendente
     sub_pending = db.query(CommunitySubmission).filter(CommunitySubmission.status == "pending").first()
@@ -256,6 +265,22 @@ def test_admin_create_post_and_moderate(client):
         db.refresh(sub_pending)
         assert sub_pending.status == "approved"
 
+    db.close()
+
+    # Author name must appear on home listing and post page
+    assert author_username is not None
+    resp_home = client.get("/")
+    assert f"[OPERADOR: {author_username}]" in resp_home.text
+    resp_detail = client.get(f"/post/{post_slug}")
+    assert f"[POR: {author_username}]" in resp_detail.text
+
+    # Cleanup: avoid polluting homepage pagination for other tests
+    db = SessionLocal()
+    created = db.query(Post).filter(Post.slug == post_slug).first()
+    if created:
+        db.query(Comment).filter(Comment.post_id == created.id).delete()
+        db.delete(created)
+        db.commit()
     db.close()
 
 
@@ -423,7 +448,7 @@ def test_admin_category_dropdown_and_custom_creation(client):
     resp_admin = client.get("/admin?tab=new_post", cookies=cookies)
     assert resp_admin.status_code == 200
     assert 'id="category_select"' in resp_admin.text
-    assert '<option value="Saga dos 28">Saga dos 28</option>' in resp_admin.text
+    assert '<option value="Diário de Bordo">Diário de Bordo</option>' in resp_admin.text
     assert '<option value="__custom__">+ [CRIAR NOVA CATEGORIA...]</option>' in resp_admin.text
 
     # 2. Cria post com categoria customizada via dropdown "__custom__"

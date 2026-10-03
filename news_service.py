@@ -40,6 +40,7 @@ DEFAULT_IMAGES = {
     "politics": "https://images.unsplash.com/photo-1541872703-74c5e44368f9?q=80&w=800&auto=format&fit=crop"
 }
 
+# Static offline contingency items. published_at is stamped at use-time (not "Hoje" forever).
 FALLBACK_NEWS = {
     "nerd": [
         {
@@ -48,7 +49,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=800&auto=format&fit=crop",
             "source": "Jovem Nerd",
             "category": "Nerd & Cultura Pop",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "O impacto duradouro de Berserk e o legado incomparável de Kentaro Miura",
@@ -56,7 +57,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800&auto=format&fit=crop",
             "source": "Omelete",
             "category": "Nerd & Cultura Pop",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "Guia definitivo de retrogaming: O renascimento dos emuladores em C++ e Rust",
@@ -64,7 +65,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop",
             "source": "Jovem Nerd",
             "category": "Nerd & Cultura Pop",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "Cinema e animação tradicional resistem ao avanço de imagens geradas por IA",
@@ -72,7 +73,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800&auto=format&fit=crop",
             "source": "Omelete",
             "category": "Nerd & Cultura Pop",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "RPG de Mesa e a busca pelo analógico em tempos de hiperconexão digital",
@@ -80,7 +81,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?q=80&w=800&auto=format&fit=crop",
             "source": "Jovem Nerd",
             "category": "Nerd & Cultura Pop",
-            "published_at": "Hoje"
+            "published_at": ""
         }
     ],
     "tech": [
@@ -90,7 +91,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=800&auto=format&fit=crop",
             "source": "Tecnoblog",
             "category": "Tecnologia & Dev",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "SQLite como banco primário em produção: O guia da simplicidade arquitetural",
@@ -98,7 +99,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=800&auto=format&fit=crop",
             "source": "Manual do Usuário",
             "category": "Tecnologia & Dev",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "Linux, terminais minimalistas e a arte de construir softwares sem bloatware",
@@ -106,7 +107,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1629654297299-c8506221ca97?q=80&w=800&auto=format&fit=crop",
             "source": "Tecnoblog",
             "category": "Tecnologia & Dev",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "Privacidade digital e soberania de dados: As ferramentas essenciais para 2026",
@@ -114,7 +115,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1563986768609-322da13575f3?q=80&w=800&auto=format&fit=crop",
             "source": "Manual do Usuário",
             "category": "Tecnologia & Dev",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "O retorno dos monitores monocromáticos e a busca por foco cognitivo no trabalho",
@@ -122,7 +123,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=800&auto=format&fit=crop",
             "source": "Tecnoblog",
             "category": "Tecnologia & Dev",
-            "published_at": "Hoje"
+            "published_at": ""
         }
     ],
     "politics": [
@@ -132,7 +133,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1541872703-74c5e44368f9?q=80&w=800&auto=format&fit=crop",
             "source": "G1 Política",
             "category": "Política & Sociedade",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "Discussões fiscais e investimentos públicos em infraestrutura para a próxima década",
@@ -140,7 +141,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?q=80&w=800&auto=format&fit=crop",
             "source": "G1 Política",
             "category": "Política & Sociedade",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "Transição energética e desafios diplomáticos na agenda climática internacional",
@@ -148,7 +149,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?q=80&w=800&auto=format&fit=crop",
             "source": "BBC Brasil",
             "category": "Política & Sociedade",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "O impacto da tecnologia na transparência pública e fiscalização cidadã",
@@ -156,7 +157,7 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=800&auto=format&fit=crop",
             "source": "G1 Política",
             "category": "Política & Sociedade",
-            "published_at": "Hoje"
+            "published_at": ""
         },
         {
             "title": "Políticas de incentivo à ciência nacional e retenção de talentos no Brasil",
@@ -164,10 +165,25 @@ FALLBACK_NEWS = {
             "image_url": "https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=800&auto=format&fit=crop",
             "source": "BBC Brasil",
             "category": "Política & Sociedade",
-            "published_at": "Hoje"
+            "published_at": ""
         }
     ]
 }
+
+
+def _with_fallback_date(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Copy fallback item and stamp the real load date (avoids eternal 'Hoje')."""
+    stamped = dict(item)
+    stamped["published_at"] = datetime.now().strftime("%d/%m/%Y")
+    return stamped
+
+
+def _stamped_fallback_hub() -> Dict[str, List[Dict[str, Any]]]:
+    """Return a full fallback hub with timestamps applied at call time."""
+    return {
+        category: [_with_fallback_date(item) for item in items]
+        for category, items in FALLBACK_NEWS.items()
+    }
 
 
 def _extract_image_from_xml_item(item: ET.Element, default_img: str) -> str:
@@ -213,15 +229,24 @@ def _clean_text(text: Optional[str]) -> str:
 def _format_pub_date(pub_date_str: Optional[str]) -> str:
     """Converte pubDate do RSS em formato legível e dinâmico em pt-BR."""
     if not pub_date_str:
-        return "Hoje"
+        return "Recente"
     try:
         dt = email.utils.parsedate_to_datetime(pub_date_str)
         now = datetime.now(dt.tzinfo) if dt.tzinfo else datetime.now()
-        if dt.date() == now.date():
+        diff = now - dt
+
+        # Prefer calendar-day labels; treat sub-24h cross-midnight as Ontem (avoids "Há 0 dias")
+        day_delta = (now.date() - dt.date()).days
+        if day_delta <= 0:
             return f"Hoje às {dt.strftime('%H:%M')}"
-        return dt.strftime("%d/%m às %H:%M")
+        elif day_delta == 1:
+            return f"Ontem às {dt.strftime('%H:%M')}"
+        elif day_delta < 7:
+            return f"Há {day_delta} dias"
+        else:
+            return dt.strftime("%d/%m/%Y às %H:%M")
     except Exception:
-        return pub_date_str[:16].strip() if pub_date_str else "Hoje"
+        return pub_date_str[:16].strip() if pub_date_str else "Recente"
 
 
 def fetch_category_feed(category: str) -> List[Dict[str, Any]]:
@@ -283,7 +308,7 @@ def fetch_category_feed(category: str) -> List[Dict[str, Any]]:
             if len(category_items) >= 5:
                 break
             if not any(it["title"] == fb["title"] for it in category_items):
-                category_items.append(fb)
+                category_items.append(_with_fallback_date(fb))
 
     return category_items[:5]
 
@@ -316,7 +341,7 @@ def get_news_hub_data() -> Dict[str, List[Dict[str, Any]]]:
         logger.error(f"[NEWS ERROR] Erro geral ao atualizar hub de notícias: {e}")
         if _NEWS_CACHE["data"]:
             return _NEWS_CACHE["data"]
-        return FALLBACK_NEWS
+        return _stamped_fallback_hub()
 
 
 def get_news_last_updated() -> str:

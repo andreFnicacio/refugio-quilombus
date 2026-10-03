@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from sqlalchemy import inspect, text
 from database import engine, SessionLocal, Base
 from models import User, Post, CommunitySubmission, Comment, SiteStat
 from auth import hash_password
@@ -8,9 +9,25 @@ from config import settings
 logger = logging.getLogger("refugio.init_db")
 
 
+def _ensure_schema_migrations():
+    """Adds nullable columns missing from existing SQLite tables (create_all won't ALTER)."""
+    inspector = inspect(engine)
+    if "posts" not in inspector.get_table_names():
+        return
+
+    post_columns = {col["name"] for col in inspector.get_columns("posts")}
+    if "author_id" not in post_columns:
+        with engine.begin() as conn:
+            conn.execute(text(
+                "ALTER TABLE posts ADD COLUMN author_id INTEGER REFERENCES users(id)"
+            ))
+        logger.info("[MIGRATE] Column posts.author_id added.")
+
+
 def init_database():
     """Cria tabelas e popula com dados iniciais limpos (1 post rico e 1 projeto no Lab)."""
     Base.metadata.create_all(bind=engine)
+    _ensure_schema_migrations()
     db = SessionLocal()
 
     try:
@@ -25,6 +42,16 @@ def init_database():
             db.add(admin_user)
             db.commit()
             logger.info(f"[SEED] Usuário admin '{settings.ADMIN_USERNAME}' configurado com sucesso.")
+
+        # Rename legacy category labels to the new naming
+        renamed = (
+            db.query(Post)
+            .filter(Post.category == "Saga dos 28")
+            .update({"category": "Diário de Bordo"}, synchronize_session=False)
+        )
+        if renamed:
+            db.commit()
+            logger.info(f"[MIGRATE] Renamed {renamed} post(s) from 'Saga dos 28' to 'Diário de Bordo'.")
 
         # 2. Contador de Visitas Digital (zerado para os primeiros acessos)
         visit_stat = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
@@ -43,6 +70,7 @@ def init_database():
                 category="Mangás & Cultura",
                 media_url="https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=1200&auto=format&fit=crop",
                 views_count=0,
+                author_id=admin_user.id,
                 content="""# Entre a Espada e a Serenidade: O Silêncio na Era do Ruído
 
 Existe uma diferença brutal entre ter vinte anos e beirar os vinte e oito. Aos vinte, o mundo parece uma arena aberta: você quer provar que é capaz, devora tutoriais como se fossem duelos de vida ou morte e acredita, no íntimo, que o segredo da vida é ser o guerreiro mais barulhento e implacável da colina.

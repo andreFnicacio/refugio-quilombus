@@ -15,6 +15,7 @@
       <span class="badge-cat">{{ post.category }}</span>
       <div class="card-meta" style="margin-bottom: 0;">
         <span>[PUBLICADO: {{ post.created_at|format_datetime }}]</span>
+        <span>[POR: {{ post.author.username|upper if post.author else 'OPERADOR' }}]</span>
         <span>[VIEWS: {{ post.views_count }}]</span>
       </div>
     </div>
