@@ -27,6 +27,81 @@
     </div>
   </section>
 
+  <!-- Destaque: Emuladores e Preservação N64 (Cross-Platform) -->
+  <section class="card-brutalist" style="border-color: var(--border-amber); box-shadow: 5px 5px 0 var(--border-amber); margin-bottom: 35px; background: #0c0d12;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; border-bottom: 1px dashed var(--border-amber); padding-bottom: 10px;">
+      <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <span style="font-family: var(--font-pixel); font-size: 0.95rem; color: var(--border-amber);">
+          [RECURSO HOMOLOGADO: EMULADOR NINTENDO 64]
+        </span>
+        <span class="badge-cat" style="border-color: var(--border-amber); color: var(--border-amber); margin: 0; font-size: 0.7rem;">
+          WINDOWS &bull; MAC &bull; LINUX
+        </span>
+      </div>
+      <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">
+        // PRESERVAÇÃO DIGITAL &amp; RETROGAMING
+      </span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+      <!-- simple64 (Recomendado Principal) -->
+      <div style="background: #000000; border: 2px solid var(--border-green); padding: 18px; box-shadow: 4px 4px 0 var(--border-green); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span class="badge-cat" style="border-color: var(--border-green); color: var(--border-green); font-size: 0.7rem; margin: 0;">
+              RECOMENDADO N64
+            </span>
+            <small style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">
+              STABLE // VULKAN
+            </small>
+          </div>
+          <h3 style="font-family: var(--font-mono); font-size: 1.15rem; color: #ffffff; margin-bottom: 8px;">
+            simple64 (anteriormente m64p)
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 16px;">
+            Um dos emuladores de Nintendo 64 mais estáveis e precisos da atualidade. Conta com os núcleos cycle-accurate Vulkan ParaLLEl-RDP e ParaLLEl-RSP integrados de fábrica, além de netplay robusto para Windows, Mac e Linux.
+          </p>
+        </div>
+        <div style="border-top: 1px dashed #203527; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--border-green);">
+            &gt; simple64.github.io
+          </span>
+          <a href="https://simple64.github.io/" target="_blank" rel="noopener noreferrer" class="btn" style="padding: 6px 14px; font-size: 0.8rem;">
+            ACESSAR SIMPLE64 &gt;&gt;
+          </a>
+        </div>
+      </div>
+
+      <!-- Ares Emulator (Alternativa de Alta Fidelidade) -->
+      <div style="background: #000000; border: 2px solid var(--border-cyan); padding: 18px; box-shadow: 4px 4px 0 var(--border-cyan); display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span class="badge-cat" style="border-color: var(--border-cyan); color: var(--border-cyan); font-size: 0.7rem; margin: 0;">
+              MULTI-SISTEMA
+            </span>
+            <small style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">
+              CYCLE-ACCURATE
+            </small>
+          </div>
+          <h3 style="font-family: var(--font-mono); font-size: 1.15rem; color: #ffffff; margin-bottom: 8px;">
+            Ares Emulator
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; margin-bottom: 16px;">
+            Emulador multi-sistema de última geração focado em preservação e fidelidade cirúrgica de hardware. Excelente performance de emulação de N64 com renderização nativa para macOS (Apple Silicon &amp; Intel) e Windows.
+          </p>
+        </div>
+        <div style="border-top: 1px dashed #143542; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <span style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--border-cyan);">
+            &gt; ares-emulator.github.io
+          </span>
+          <a href="https://ares-emulator.github.io/" target="_blank" rel="noopener noreferrer" class="btn btn-cyan" style="padding: 6px 14px; font-size: 0.8rem;">
+            ACESSAR ARES &gt;&gt;
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Top 5 Podium Ranking -->
   {% if top_5 %}
     <section class="top5-container">
@@ -107,7 +182,7 @@
               {{ sub.created_at|format_datetime }}
             </span>
             <a href="/lab/redirect/{{ sub.id }}" target="_blank" rel="noopener noreferrer" class="btn" style="padding: 6px 12px; font-size: 0.8rem;">
-              ACESSAR GITHUB &gt;&gt;
+              VISITAR RECURSO &gt;&gt;
             </a>
           </div>
         </div>

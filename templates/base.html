@@ -44,7 +44,7 @@
       </div>
 
       <nav class="main-nav">
-        <a href="/" class="nav-btn {% if request.url.path == '/' %}active{% endif %}">
+        <a href="/diario" class="nav-btn {% if request.url.path == '/' or request.url.path == '/diario' %}active{% endif %}">
           [01. DIÁRIO]
         </a>
         <a href="/lab" class="nav-btn {% if '/lab' in request.url.path %}active{% endif %}">

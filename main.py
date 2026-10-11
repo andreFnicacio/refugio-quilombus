@@ -44,6 +44,12 @@ from auth import (
 )
 from init_db import init_database
 from news_service import get_news_hub_data
+from media_utils import (
+    extract_youtube_id,
+    render_youtube_card,
+    render_link_preview,
+    process_media_links
+)
 
 
 # Rate Limiter em memória (FinOps: zero overhead de Redis para instâncias locais/leves)
@@ -162,13 +168,14 @@ def clean_plain_text(text: str) -> str:
 ALLOWED_TAGS = [
     "a", "abbr", "acronym", "b", "blockquote", "code", "em", "i", "li", "ol",
     "strong", "ul", "p", "h1", "h2", "h3", "h4", "h5", "h6", "pre", "table",
-    "thead", "tbody", "tr", "th", "td", "img", "hr", "br", "span", "div"
+    "thead", "tbody", "tr", "th", "td", "img", "hr", "br", "span", "div", "iframe"
 ]
 ALLOWED_ATTRIBUTES = {
-    "*": ["class", "id"],
+    "*": ["class", "id", "data-video-id"],
     "a": ["href", "title", "target", "rel"],
     "img": ["src", "alt", "title", "loading", "width", "height"],
     "code": ["class"],
+    "iframe": ["src", "width", "height", "frameborder", "allow", "allowfullscreen", "title", "loading"],
 }
 ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
 
@@ -177,8 +184,10 @@ def render_markdown(text: str) -> str:
     """Renderiza Markdown e sanitiza com Bleach para imunizar a aplicação contra XSS."""
     if not text:
         return ""
+    # Processa links de vídeo do YouTube e hiperlinks formatados antes do parser
+    processed_text = process_media_links(text)
     # Expurga qualquer bloco <script> e seu conteúdo antes do processamento
-    sanitized_input = re.sub(r"<script\b[^>]*>([\s\S]*?)<\/script>", "", text, flags=re.IGNORECASE)
+    sanitized_input = re.sub(r"<script\b[^>]*>([\s\S]*?)<\/script>", "", processed_text, flags=re.IGNORECASE)
     raw_html = markdown.markdown(
         sanitized_input,
         extensions=["extra", "fenced_code", "tables", "nl2br", "sane_lists"]
@@ -191,6 +200,27 @@ def render_markdown(text: str) -> str:
         strip=True
     )
     return cleaned_html
+
+
+def render_post_media(media_url: Optional[str], title: str = "", slug: str = "") -> str:
+    """Renderiza capa da publicação: card de YouTube se for vídeo ou tag <img> se for imagem."""
+    if not media_url:
+        return ""
+    yt_id = extract_youtube_id(media_url)
+    if yt_id:
+        return render_youtube_card(yt_id, media_url)
+    safe_src = html.escape(media_url)
+    safe_title = html.escape(title)
+    if slug:
+        return f'<a href="/post/{html.escape(slug)}"><img src="{safe_src}" alt="{safe_title}" class="post-media-cover" loading="lazy"></a>'
+    return f'<img src="{safe_src}" alt="{safe_title}" class="post-media-cover" loading="lazy">'
+
+
+def get_first_youtube_id(content: Optional[str]) -> Optional[str]:
+    """Extrai o primeiro ID de vídeo do YouTube presente no conteúdo, caso exista."""
+    if not content:
+        return None
+    return extract_youtube_id(content)
 
 
 def format_datetime(value: Optional[datetime]) -> str:
@@ -208,6 +238,10 @@ def format_odometer(value: int) -> list[str]:
 templates.env.filters["markdown"] = render_markdown
 templates.env.filters["format_datetime"] = format_datetime
 templates.env.filters["format_odometer"] = format_odometer
+templates.env.filters["render_media"] = render_post_media
+templates.env.filters["render_youtube_card"] = render_youtube_card
+templates.env.filters["extract_youtube_id"] = extract_youtube_id
+templates.env.filters["get_first_youtube_id"] = get_first_youtube_id
 templates.env.globals["app_name"] = settings.APP_NAME
 templates.env.globals["base_url"] = settings.BASE_URL
 
@@ -277,6 +311,17 @@ def index(
             "current_user": current_user
         }
     )
+
+
+@app.get("/diario", response_class=HTMLResponse)
+def diario_feed(
+    request: Request,
+    page: int = 1,
+    category: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Alias direto para a rota do Diário de Bordo (/diario)."""
+    return index(request=request, page=page, category=category, db=db)
 
 
 @app.get("/post/{slug}", response_class=HTMLResponse)

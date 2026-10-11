@@ -641,5 +641,138 @@ def test_counters_preservation_on_init_and_lifespan():
     db.close()
 
 
+def test_radar_omelete_integration_and_fallback(client):
+    from news_service import fetch_omelete_news, get_news_hub_data
+    items = fetch_omelete_news()
+    assert len(items) == 5
+    for item in items:
+        assert item["source"] == "Omelete"
+        assert item["category"] == "nerd"
+        assert item["title"] != ""
+        assert item["link"].startswith("http")
+        assert item["image_url"].startswith("http")
+        assert item["published_at"] != ""
+
+    # Testa renderização na página /radar
+    resp = client.get("/radar")
+    assert resp.status_code == 200
+    assert "Omelete" in resp.text
+    assert "NERD &amp; CULTURA" in resp.text
+
+
+def test_extract_youtube_id_formats():
+    from media_utils import extract_youtube_id
+
+    # Formatos suportados
+    assert extract_youtube_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+    assert extract_youtube_id("https://youtube.com/watch?v=dQw4w9WgXcQ&t=42s") == "dQw4w9WgXcQ"
+    assert extract_youtube_id("https://m.youtube.com/watch?v=dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+    assert extract_youtube_id("https://youtu.be/dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+    assert extract_youtube_id("https://youtu.be/dQw4w9WgXcQ?si=abcdef123") == "dQw4w9WgXcQ"
+    assert extract_youtube_id("https://www.youtube.com/shorts/dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+    assert extract_youtube_id("https://youtube.com/shorts/dQw4w9WgXcQ?feature=share") == "dQw4w9WgXcQ"
+    assert extract_youtube_id("https://www.youtube.com/embed/dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+
+    # Links não-youtube
+    assert extract_youtube_id("https://simple64.github.io/") is None
+    assert extract_youtube_id("https://github.com/torvalds/linux") is None
+    assert extract_youtube_id("") is None
+    assert extract_youtube_id(None) is None
+
+
+def test_render_youtube_card_and_link_preview():
+    from media_utils import render_youtube_card, render_link_preview, process_media_links
+
+    card_html = render_youtube_card("dQw4w9WgXcQ")
+    assert "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" in card_html
+    assert 'data-video-id="dQw4w9WgXcQ"' in card_html
+    assert "video-thumbnail-container" in card_html
+    assert "video-play-overlay" in card_html
+    assert "ASSISTIR NO YOUTUBE" in card_html
+
+    link_html = render_link_preview("https://simple64.github.io/")
+    assert "simple64.github.io" in link_html
+    assert "link-preview-box" in link_html
+    assert "VISITAR" in link_html
+
+    # Processamento em texto
+    raw_text = """Aqui está um vídeo:
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+
+E um link para emulador:
+https://simple64.github.io/
+"""
+    processed = process_media_links(raw_text)
+    assert "video-embed-card" in processed
+    assert "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" in processed
+    assert "link-preview-box" in processed
+
+
+def test_post_and_diario_youtube_embed_rendering(client):
+    import uuid
+    from auth import create_session_token
+
+    token = create_session_token(settings.ADMIN_USERNAME)
+    cookies = {settings.SESSION_COOKIE_NAME: token}
+
+    unique_slug = f"post-com-video-{uuid.uuid4().hex[:6]}"
+    video_post_data = {
+        "title": "Apresentação de Tecnologia Retrô",
+        "category": "Dev & Tech",
+        "content": "Confira o documentário completo sobre emulação:\nhttps://www.youtube.com/watch?v=dQw4w9WgXcQ\n\nTexto final.",
+        "media_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    }
+
+    # 1. Cria post
+    resp_create = client.post("/admin/posts/new", data=video_post_data, cookies=cookies, follow_redirects=False)
+    assert resp_create.status_code == 303
+
+    db = SessionLocal()
+    created = db.query(Post).filter(Post.title == "Apresentação de Tecnologia Retrô").first()
+    assert created is not None
+    created_slug = created.slug
+    db.close()
+
+    try:
+        # 2. Testa na rota /post/{slug}
+        resp_post = client.get(f"/post/{created_slug}")
+        assert resp_post.status_code == 200
+        assert "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" in resp_post.text
+        assert "video-embed-card" in resp_post.text
+        assert 'data-video-id="dQw4w9WgXcQ"' in resp_post.text
+
+        # 3. Testa na rota /diario
+        resp_diario = client.get("/diario")
+        assert resp_diario.status_code == 200
+        assert "Apresentação de Tecnologia Retrô" in resp_diario.text
+        assert "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" in resp_diario.text
+        assert "video-embed-card" in resp_diario.text
+
+        # 4. Testa na rota /
+        resp_home = client.get("/")
+        assert resp_home.status_code == 200
+        assert "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" in resp_home.text
+    finally:
+        # Cleanup
+        db = SessionLocal()
+        p = db.query(Post).filter(Post.id == created.id).first()
+        if p:
+            db.delete(p)
+            db.commit()
+        db.close()
+
+
+def test_lab_simple64_n64_emulator_resource(client):
+    resp = client.get("/lab")
+    assert resp.status_code == 200
+    assert "simple64" in resp.text
+    assert "https://simple64.github.io/" in resp.text
+    assert "Ares Emulator" in resp.text
+    assert "https://ares-emulator.github.io/" in resp.text
+    assert "EMULADOR NINTENDO 64" in resp.text
+    assert 'rel="noopener noreferrer"' in resp.text
+
+
+
 
 

@@ -91,6 +91,25 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   });
+
+  // 5. Interatividade dos Embeds de Vídeo do YouTube (Facade Pattern: monta iframe leve ao clicar)
+  document.addEventListener("click", (e) => {
+    const thumbContainer = e.target.closest(".video-thumbnail-container");
+    if (!thumbContainer) return;
+
+    const videoId = thumbContainer.getAttribute("data-video-id");
+    if (!videoId) return;
+
+    const iframe = document.createElement("iframe");
+    iframe.className = "video-embed-iframe";
+    iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&rel=0`;
+    iframe.title = "YouTube Video Player";
+    iframe.frameBorder = "0";
+    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+    iframe.allowFullscreen = true;
+
+    thumbContainer.parentNode.replaceChild(iframe, thumbContainer);
+  });
 });
 
 // 5. Alternador dinâmico de Categoria Customizada no Painel Admin

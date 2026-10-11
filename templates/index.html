@@ -35,9 +35,12 @@
           </h2>
 
           {% if post.media_url %}
-            <a href="/post/{{ post.slug }}">
-              <img src="{{ post.media_url }}" alt="{{ post.title }}" class="post-media-cover" loading="lazy">
-            </a>
+            {{ post.media_url | render_media(post.title, post.slug) | safe }}
+          {% else %}
+            {% set yt_id = post.content | get_first_youtube_id %}
+            {% if yt_id %}
+              {{ yt_id | render_youtube_card | safe }}
+            {% endif %}
           {% endif %}
 
           <div style="color: var(--text-muted); margin-bottom: 20px; font-size: 0.95rem;">

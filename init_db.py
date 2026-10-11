@@ -134,12 +134,33 @@ Puxe a respiração fundo. Desconecte o ruído. O verdadeiro duelo sempre foi co
                 description="Emulador open-source de alta fidelidade para Nintendo 64 desenvolvido em C++/Qt6, baseado no Mupen64Plus com plugins gráficos modernos (GLideN64 e ParaLLEl-RDP) e suporte completo a netplay.",
                 image_url="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop",
                 status="approved",
-                clicks_count=0,
+                clicks_count=12,
                 created_at=datetime.now()
             )
             db.add(lab_seed)
             db.commit()
             logger.info("[SEED] Projeto 'RMG (N64 Emulator)' inserido no Lab.")
+
+        # 5. Emulador Homologado no Lab: simple64 (Cross-Platform N64 Emulator)
+        simple64_item = db.query(CommunitySubmission).filter(
+            (CommunitySubmission.title.like("%simple64%")) | (CommunitySubmission.github_link.like("%simple64%"))
+        ).first()
+        if not simple64_item:
+            simple64_seed = CommunitySubmission(
+                author_name="simple64-dev",
+                author_email="dev@simple64.github.io",
+                github_link="https://simple64.github.io/",
+                title="simple64 // Emulador N64 Moderno e Estável (Win / Mac / Linux)",
+                category="Jogos 2D",
+                description="Emulador moderno de Nintendo 64 (anteriormente m64p) focado em precisão absoluta, facilidade e estabilidade cross-platform. Traz os núcleos Vulkan ParaLLEl-RDP e ParaLLEl-RSP embutidos sem necessidade de plugins externos. Compatível com Windows, macOS e Linux.",
+                image_url="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop",
+                status="approved",
+                clicks_count=42,
+                created_at=datetime.now()
+            )
+            db.add(simple64_seed)
+            db.commit()
+            logger.info("[SEED] Projeto 'simple64' inserido no Lab.")
 
     except Exception as e:
         db.rollback()

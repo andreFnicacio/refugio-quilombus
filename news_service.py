@@ -3,6 +3,7 @@ import time
 import html
 import logging
 import email.utils
+import subprocess
 from datetime import datetime
 import xml.etree.ElementTree as ET
 from typing import List, Dict, Any, Optional
@@ -44,11 +45,11 @@ DEFAULT_IMAGES = {
 FALLBACK_NEWS = {
     "nerd": [
         {
-            "title": "Novas adaptações de mangás clássicos ganham destaque em 2026",
-            "link": "https://jovemnerd.com.br",
+            "title": "Grandes estreias e adaptações de ficção e fantasia ganham destaque em 2026",
+            "link": "https://www.omelete.com.br",
             "image_url": "https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=800&auto=format&fit=crop",
-            "source": "Jovem Nerd",
-            "category": "Nerd & Cultura Pop",
+            "source": "Omelete",
+            "category": "nerd",
             "published_at": ""
         },
         {
@@ -56,15 +57,15 @@ FALLBACK_NEWS = {
             "link": "https://www.omelete.com.br",
             "image_url": "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?q=80&w=800&auto=format&fit=crop",
             "source": "Omelete",
-            "category": "Nerd & Cultura Pop",
+            "category": "nerd",
             "published_at": ""
         },
         {
-            "title": "Guia definitivo de retrogaming: O renascimento dos emuladores em C++ e Rust",
-            "link": "https://jovemnerd.com.br",
+            "title": "Guia de retrogaming e emulação: Clássicos dos 16 e 64 bits em alta fidelidade",
+            "link": "https://www.omelete.com.br",
             "image_url": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=800&auto=format&fit=crop",
-            "source": "Jovem Nerd",
-            "category": "Nerd & Cultura Pop",
+            "source": "Omelete",
+            "category": "nerd",
             "published_at": ""
         },
         {
@@ -72,15 +73,15 @@ FALLBACK_NEWS = {
             "link": "https://www.omelete.com.br",
             "image_url": "https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=800&auto=format&fit=crop",
             "source": "Omelete",
-            "category": "Nerd & Cultura Pop",
+            "category": "nerd",
             "published_at": ""
         },
         {
             "title": "RPG de Mesa e a busca pelo analógico em tempos de hiperconexão digital",
-            "link": "https://jovemnerd.com.br",
+            "link": "https://www.omelete.com.br",
             "image_url": "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?q=80&w=800&auto=format&fit=crop",
-            "source": "Jovem Nerd",
-            "category": "Nerd & Cultura Pop",
+            "source": "Omelete",
+            "category": "nerd",
             "published_at": ""
         }
     ],
@@ -227,15 +228,23 @@ def _clean_text(text: Optional[str]) -> str:
 
 
 def _format_pub_date(pub_date_str: Optional[str]) -> str:
-    """Converte pubDate do RSS em formato legível e dinâmico em pt-BR."""
+    """Converte pubDate do RSS ou ISO 8601 em formato legível e dinâmico em pt-BR."""
     if not pub_date_str:
         return "Recente"
     try:
-        dt = email.utils.parsedate_to_datetime(pub_date_str)
-        now = datetime.now(dt.tzinfo) if dt.tzinfo else datetime.now()
-        diff = now - dt
+        dt = None
+        # Tenta RFC 2822 (RSS pubDate)
+        try:
+            dt = email.utils.parsedate_to_datetime(pub_date_str)
+        except Exception:
+            pass
 
-        # Prefer calendar-day labels; treat sub-24h cross-midnight as Ontem (avoids "Há 0 dias")
+        # Tenta ISO 8601 (Omelete data-published: 2026-10-11 02:53:59+00:00 ou Z)
+        if dt is None:
+            clean_str = pub_date_str.strip().replace("Z", "+00:00")
+            dt = datetime.fromisoformat(clean_str)
+
+        now = datetime.now(dt.tzinfo) if dt.tzinfo else datetime.now()
         day_delta = (now.date() - dt.date()).days
         if day_delta <= 0:
             return f"Hoje às {dt.strftime('%H:%M')}"
@@ -249,8 +258,122 @@ def _format_pub_date(pub_date_str: Optional[str]) -> str:
         return pub_date_str[:16].strip() if pub_date_str else "Recente"
 
 
+def fetch_omelete_news() -> List[Dict[str, Any]]:
+    """
+    Coleta e parseia as 5 principais notícias mais recentes diretamente do Omelete (https://www.omelete.com.br/).
+    Possui resiliência de transporte (httpx com fallback para curl do sistema contra quirks de TLS do Akamai)
+    e fallback estrito para garantir que a coluna nunca quebre.
+    """
+    category_items: List[Dict[str, Any]] = []
+    default_img = DEFAULT_IMAGES.get("nerd", "https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=800&auto=format&fit=crop")
+    url = "https://www.omelete.com.br/"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+
+    raw_html = ""
+    # 1. Tentativa primária via httpx com timeout curto
+    try:
+        with httpx.Client(timeout=4.0, headers=headers, follow_redirects=True) as client:
+            resp = client.get(url)
+            if resp.status_code == 200 and resp.text:
+                raw_html = resp.text
+    except Exception as e:
+        logger.debug(f"[OMELETE] Conexão httpx falhou ({e}), acionando fallback de rede...")
+
+    # 2. Fallback de transporte para curl caso haja handshake TLS time-out no ambiente local/container
+    if not raw_html:
+        try:
+            cmd = [
+                "curl", "-s", "-L", "--max-time", "4",
+                "-A", headers["User-Agent"],
+                url
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if res.returncode == 0 and res.stdout:
+                raw_html = res.stdout
+        except Exception as e:
+            logger.warning(f"[OMELETE] Falha na requisição curl ao Omelete: {e}")
+
+    # 3. Parsing das notícias se o HTML foi obtido com sucesso
+    if raw_html:
+        try:
+            article_chunks = re.findall(r'<article\b[^>]*>(.*?)</article>', raw_html, flags=re.DOTALL | re.IGNORECASE)
+            for chunk in article_chunks:
+                if len(category_items) >= 5:
+                    break
+
+                # Título da matéria (<h2 ...> ou <h3 ...>)
+                h_match = re.search(r'<h[1-3]\b[^>]*>(.*?)</h[1-3]>', chunk, flags=re.DOTALL | re.IGNORECASE)
+                if not h_match:
+                    continue
+                title = _clean_text(h_match.group(1))
+                if not title or len(title) < 5:
+                    continue
+
+                # Link de destino
+                link_match = re.search(r'<a\b[^>]*\bhref=[\"\']([^\"\']+)[\"\']', chunk, flags=re.IGNORECASE)
+                if not link_match:
+                    continue
+                link = link_match.group(1).strip()
+                if not link:
+                    continue
+                if link.startswith("/"):
+                    link = f"https://www.omelete.com.br{link}"
+                elif not link.startswith("http://") and not link.startswith("https://"):
+                    link = f"https://www.omelete.com.br/{link}"
+
+                # Evita itens duplicados
+                if any(existing["link"] == link for existing in category_items):
+                    continue
+
+                # Imagem de capa (src ou data-lazy-src)
+                img_match = re.search(r'<img\b[^>]*\b(?:src|data-lazy-src|data-src)=[\"\']([^\"\']+)[\"\']', chunk, flags=re.IGNORECASE)
+                img_url = default_img
+                if img_match:
+                    extracted_img = img_match.group(1).strip()
+                    if extracted_img.startswith("//"):
+                        img_url = f"https:{extracted_img}"
+                    elif extracted_img.startswith("/"):
+                        img_url = f"https://www.omelete.com.br{extracted_img}"
+                    elif extracted_img.startswith("http://") or extracted_img.startswith("https://"):
+                        img_url = extracted_img
+
+                # Data de publicação (atributo data-published)
+                date_match = re.search(r'data-published=[\"\']([^\"\']+)[\"\']', chunk, flags=re.IGNORECASE)
+                raw_date = date_match.group(1).strip() if date_match else None
+                pub_date = _format_pub_date(raw_date)
+
+                category_items.append({
+                    "title": title,
+                    "link": link,
+                    "image_url": img_url,
+                    "source": "Omelete",
+                    "category": "nerd",
+                    "published_at": pub_date
+                })
+        except Exception as e:
+            logger.warning(f"[OMELETE] Erro ao parsear notícias do Omelete: {e}")
+
+    # 4. Fallback de contingência caso scraping falhe ou traga menos de 5 matérias
+    if len(category_items) < 5:
+        fallbacks = FALLBACK_NEWS.get("nerd", [])
+        for fb in fallbacks:
+            if len(category_items) >= 5:
+                break
+            if not any(it["title"] == fb["title"] for it in category_items):
+                category_items.append(_with_fallback_date(fb))
+
+    return category_items[:5]
+
+
 def fetch_category_feed(category: str) -> List[Dict[str, Any]]:
     """Busca e parseia itens de uma categoria com timeout estrito e fallback."""
+    if category == "nerd":
+        return fetch_omelete_news()
+
     feed_list = FEEDS.get(category, [])
     category_items = []
     default_img = DEFAULT_IMAGES.get(category, DEFAULT_IMAGES["tech"])
