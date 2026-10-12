@@ -1079,6 +1079,16 @@ def get_service_worker():
     )
 
 
+@app.get("/manifest.json")
+def get_manifest():
+    """Entrega o Web App Manifest para PWA standalone no celular."""
+    manifest_path = os.path.join("static", "manifest.json")
+    return FileResponse(
+        manifest_path,
+        media_type="application/manifest+json"
+    )
+
+
 @app.get("/api/push/vapid-public-key")
 def get_push_vapid_key():
     """Retorna a chave publica VAPID para os navegadores realizarem a inscricao."""

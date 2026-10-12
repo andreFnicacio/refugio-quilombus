@@ -824,6 +824,15 @@ main {
    RESPONSIVE DESIGN (TACTICAL MOBILE REFINEMENT)
    ========================================================================== */
 @media (max-width: 768px) {
+  /* Barra verde de status do terminal exclusiva para computadores */
+  .terminal-ticker {
+    display: none !important;
+  }
+
+  .site-header {
+    padding: 14px 0;
+  }
+
   .header-content {
     flex-direction: column;
     align-items: flex-start;
@@ -896,18 +905,6 @@ main {
   .nav-btn {
     font-size: 0.74rem;
     padding: 8px 8px;
-  }
-
-  .terminal-ticker {
-    padding: 6px 12px;
-    font-size: 0.7rem;
-    gap: 14px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .terminal-ticker::-webkit-scrollbar {
-    display: none;
   }
 }
 
