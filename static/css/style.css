@@ -909,26 +909,6 @@ main {
   .terminal-ticker::-webkit-scrollbar {
     display: none;
   }
-
-  .push-consent-modal {
-    padding: 12px;
-  }
-
-  .push-consent-box {
-    padding: 18px 14px;
-    box-shadow: 6px 6px 0px #000000;
-  }
-
-  .push-consent-actions {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .push-action-btn {
-    width: 100%;
-    padding: 12px 14px;
-    font-size: 0.82rem;
-  }
 }
 
 /* ==========================================================================
@@ -1273,4 +1253,26 @@ main {
 .push-action-btn.btn-secondary:hover {
   background: var(--text-muted);
   color: var(--bg-deep);
+}
+
+@media (max-width: 480px) {
+  .push-consent-modal {
+    padding: 12px;
+  }
+
+  .push-consent-box {
+    padding: 18px 14px;
+    box-shadow: 6px 6px 0px #000000;
+  }
+
+  .push-consent-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .push-action-btn {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 0.82rem;
+  }
 }
