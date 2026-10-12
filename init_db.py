@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from sqlalchemy import inspect, text
 from database import engine, SessionLocal, Base
-from models import User, Post, CommunitySubmission, Comment, SiteStat
+from models import User, Post, CommunitySubmission, Comment, SiteStat, PushSubscription, PushLog
 from auth import hash_password
 from config import settings
 

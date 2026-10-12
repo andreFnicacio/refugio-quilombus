@@ -19,11 +19,13 @@ from fastapi import (
     status,
     BackgroundTasks
 )
-from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import asyncio
+import logging
 import markdown
 import bleach
 from slowapi import Limiter
@@ -32,7 +34,17 @@ from slowapi.errors import RateLimitExceeded
 
 from config import settings
 from database import get_db, SessionLocal, engine
-from models import User, Post, CommunitySubmission, Comment, SiteStat
+from models import User, Post, CommunitySubmission, Comment, SiteStat, PushSubscription, PushLog
+from schemas import PushSubscriptionCreate, PushUnsubscribeRequest, PushBroadcastRequest
+from push_service import (
+    ensure_vapid_keys,
+    get_vapid_public_key,
+    register_subscription,
+    unregister_subscription,
+    broadcast_notification,
+    send_post_push_notification,
+    check_and_send_daily_news_digest
+)
 from auth import (
     require_admin,
     get_current_user_optional,
@@ -56,12 +68,40 @@ from media_utils import (
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
 
+logger = logging.getLogger("refugio.main")
+
+
+async def run_daily_digest_scheduler():
+    """Rotina em segundo plano que verifica e envia o resumo diario de noticias do Radar."""
+    while True:
+        try:
+            await asyncio.sleep(3600)
+            await asyncio.to_thread(check_and_send_daily_news_digest)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"[PUSH SCHEDULER] Erro no agendador de resumo diario: {e}")
+            await asyncio.sleep(60)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Inicialização automática do banco e seed anti-tela pelada
+    # Inicializacao automatica do banco e seed anti-tela pelada
     init_database()
+    ensure_vapid_keys()
+
+    # Inicia tarefa em segundo plano para o resumo diario do Radar
+    digest_task = asyncio.create_task(run_daily_digest_scheduler())
+
     yield
-    # Checkpoint de saída para consolidar WAL no arquivo blog.db antes de reiniciar container
+
+    digest_task.cancel()
+    try:
+        await digest_task
+    except asyncio.CancelledError:
+        pass
+
+    # Checkpoint de saida para consolidar WAL no arquivo blog.db antes de reiniciar container
     try:
         with engine.connect() as conn:
             conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE);")
@@ -658,6 +698,9 @@ def admin_dashboard(
     recent_comments = db.query(Comment).order_by(Comment.created_at.desc()).limit(30).all()
     operators = db.query(User).order_by(User.created_at.asc()).all()
 
+    push_subscribers_count = db.query(PushSubscription).count()
+    push_logs = db.query(PushLog).order_by(PushLog.sent_at.desc()).limit(15).all()
+
     # Categorias consolidadas para o dropdown de criação de posts
     available_categories = get_available_post_categories(db)
 
@@ -668,7 +711,8 @@ def admin_dashboard(
         "pending_submissions": len(pending_submissions),
         "approved_submissions": len(approved_submissions),
         "total_comments": db.query(Comment).count(),
-        "total_visits": visits
+        "total_visits": visits,
+        "push_subscribers": push_subscribers_count
     }
 
     return templates.TemplateResponse(
@@ -687,13 +731,16 @@ def admin_dashboard(
             "stats": stats,
             "active_tab": tab,
             "total_visits": visits,
-            "flash_message": request.query_params.get("msg")
+            "flash_message": request.query_params.get("msg"),
+            "push_logs": push_logs,
+            "vapid_public_key": get_vapid_public_key()
         }
     )
 
 
 @app.post("/admin/posts/new")
 async def admin_create_post(
+    background_tasks: BackgroundTasks,
     title: str = Form(...),
     content: str = Form(...),
     category: str = Form("Geral"),
@@ -752,6 +799,9 @@ async def admin_create_post(
     )
     db.add(post)
     db.commit()
+
+    # Disparo assincrono em segundo plano para inscritos no Web Push
+    background_tasks.add_task(send_post_push_notification, post)
 
     return RedirectResponse(
         url="/admin?tab=posts&msg=Post+publicado+com+sucesso",
@@ -1007,5 +1057,99 @@ def news_radar(
             "total_visits": visits,
             "current_user": current_user
         }
+    )
+
+
+# --- ROTAS DE WEB PUSH NOTIFICATIONS ---
+
+@app.get("/favicon.ico")
+def get_favicon():
+    """Entrega o favicon do blog."""
+    return FileResponse("static/favicon.ico", media_type="image/x-icon")
+
+
+@app.get("/sw.js")
+def get_service_worker():
+    """Entrega o Service Worker com escopo raiz para o Web Push."""
+    sw_path = os.path.join("static", "sw.js")
+    return FileResponse(
+        sw_path,
+        media_type="application/javascript",
+        headers={"Service-Worker-Allowed": "/"}
+    )
+
+
+@app.get("/api/push/vapid-public-key")
+def get_push_vapid_key():
+    """Retorna a chave publica VAPID para os navegadores realizarem a inscricao."""
+    return {"public_key": get_vapid_public_key()}
+
+
+@app.post("/api/push/subscribe")
+def api_push_subscribe(
+    payload: PushSubscriptionCreate,
+    db: Session = Depends(get_db)
+):
+    """Registra ou atualiza a assinatura de notificacoes do leitor."""
+    sub = register_subscription(
+        db=db,
+        endpoint=payload.endpoint,
+        p256dh=payload.p256dh,
+        auth=payload.auth,
+        user_agent=payload.user_agent
+    )
+    return {"status": "ok", "id": sub.id}
+
+
+@app.post("/api/push/unsubscribe")
+def api_push_unsubscribe(
+    payload: PushUnsubscribeRequest,
+    db: Session = Depends(get_db)
+):
+    """Remove a assinatura de notificacoes do leitor."""
+    removed = unregister_subscription(db=db, endpoint=payload.endpoint)
+    return {"status": "ok", "removed": removed}
+
+
+@app.post("/admin/push/broadcast")
+async def admin_push_broadcast(
+    background_tasks: BackgroundTasks,
+    title: str = Form(...),
+    body: str = Form(...),
+    target_url: str = Form("/"),
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    """Dispara um comunicado ou teste manual para todos os navegadores inscritos."""
+    clean_title = clean_plain_text(title)
+    clean_body = clean_plain_text(body)
+    clean_url = target_url.strip() or "/"
+
+    background_tasks.add_task(
+        broadcast_notification,
+        clean_title,
+        clean_body,
+        clean_url,
+        "manual"
+    )
+
+    return RedirectResponse(
+        url="/admin?tab=push&msg=Disparo+de+notificacao+iniciado+em+segundo+plano.",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@app.post("/admin/push/digest-now")
+async def admin_push_digest_now(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    """Dispara imediatamente o resumo do Radar para todos os assinantes ignorando o limite de 24h."""
+    background_tasks.add_task(check_and_send_daily_news_digest, force=True)
+
+    return RedirectResponse(
+        url="/admin?tab=push&msg=Resumo+do+Radar+disparado+com+sucesso+para+os+inscritos.",
+        status_code=status.HTTP_303_SEE_OTHER
     )
 

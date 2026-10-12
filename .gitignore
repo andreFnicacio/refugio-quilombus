@@ -9,3 +9,5 @@ __pycache__/
 static/uploads/*
 !static/uploads/.gitkeep
 backups/
+*.pem
+encrypted.data

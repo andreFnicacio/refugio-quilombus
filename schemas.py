@@ -95,3 +95,21 @@ class CommunitySubmissionOut(CommunitySubmissionBase):
 
     class Config:
         from_attributes = True
+
+
+# --- PUSH NOTIFICATION SCHEMAS ---
+class PushSubscriptionCreate(BaseModel):
+    endpoint: str = Field(..., min_length=10)
+    p256dh: str = Field(..., min_length=10)
+    auth: str = Field(..., min_length=10)
+    user_agent: Optional[str] = None
+
+
+class PushUnsubscribeRequest(BaseModel):
+    endpoint: str = Field(..., min_length=10)
+
+
+class PushBroadcastRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=200)
+    body: str = Field(..., min_length=3, max_length=500)
+    target_url: str = Field(default="/", max_length=500)

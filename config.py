@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     SESSION_COOKIE_NAME: str = "refugio_session"
     MAX_UPLOAD_SIZE_MB: int = 5
 
+    # Web Push VAPID
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY_PATH: str = "vapid_private.pem"
+    VAPID_CLAIM_EMAIL: str = "admin@refugio.local"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

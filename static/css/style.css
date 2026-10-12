@@ -1022,3 +1022,161 @@ main {
   color: var(--border-green);
   text-decoration-color: var(--border-green);
 }
+
+/* ==========================================================================
+   WEB PUSH NOTIFICATIONS (NEO-BRUTALISM RETRO)
+   ========================================================================== */
+.push-consent-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(5, 7, 10, 0.82);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.push-consent-box {
+  background: var(--bg-surface);
+  border: 3px solid var(--border-green);
+  box-shadow: 10px 10px 0px #000000;
+  padding: 24px;
+  max-width: 520px;
+  width: 100%;
+  font-family: var(--font-mono);
+  animation: pushZoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+@keyframes pushZoomIn {
+  from {
+    transform: scale(0.92) translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.push-consent-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px dashed var(--border-green);
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+.push-consent-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--border-green);
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.push-pulse-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  background-color: var(--border-green);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--border-green);
+  animation: pushPulse 1.4s infinite ease-in-out;
+}
+
+@keyframes pushPulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.75); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.push-close-btn {
+  background: transparent;
+  border: 1px solid var(--text-dim);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 0.8rem;
+  padding: 1px 6px;
+  transition: all 0.1s ease;
+}
+
+.push-close-btn:hover {
+  background: var(--border-pink);
+  color: #ffffff;
+  border-color: var(--border-pink);
+}
+
+.push-consent-tagline {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--border-cyan);
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.push-consent-body p {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: #ffffff;
+  line-height: 1.55;
+  margin-bottom: 18px;
+}
+
+.push-consent-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.push-action-btn {
+  flex: 1;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 2px solid var(--border-green);
+  box-shadow: 3px 3px 0px #000000;
+  transition: transform 0.05s ease, background 0.1s ease;
+  text-align: center;
+}
+
+.push-action-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0px #000000;
+}
+
+.push-action-btn.btn-primary {
+  background: var(--border-green);
+  color: #000000;
+  border-color: var(--border-green);
+  font-weight: 800;
+}
+
+.push-action-btn.btn-primary:hover {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+}
+
+.push-action-btn.btn-secondary {
+  border-color: var(--text-muted);
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.push-action-btn.btn-secondary:hover {
+  background: var(--text-muted);
+  color: var(--bg-deep);
+}

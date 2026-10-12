@@ -95,3 +95,35 @@ class SiteStat(Base):
 
     def __repr__(self):
         return f"<SiteStat {self.key}={self.value}>"
+
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    endpoint = Column(Text, unique=True, nullable=False, index=True)
+    p256dh = Column(String(255), nullable=False)
+    auth = Column(String(255), nullable=False)
+    user_agent = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    last_notified_at = Column(DateTime, nullable=True)
+
+    def __repr__(self):
+        return f"<PushSubscription {self.id} ({self.endpoint[:30]}...)>"
+
+
+class PushLog(Base):
+    __tablename__ = "push_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    notification_type = Column(String(50), nullable=False)  # post, news_digest, manual
+    title = Column(String(200), nullable=False)
+    body = Column(Text, nullable=False)
+    target_url = Column(String(500), nullable=False)
+    total_recipients = Column(Integer, default=0, nullable=False)
+    success_count = Column(Integer, default=0, nullable=False)
+    failure_count = Column(Integer, default=0, nullable=False)
+    sent_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    def __repr__(self):
+        return f"<PushLog {self.notification_type}: {self.title}>"

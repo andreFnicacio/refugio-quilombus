@@ -45,6 +45,10 @@
       <div class="metric-val">{{ stats.total_visits }}</div>
       <div class="metric-lbl">Visitas Globais</div>
     </div>
+    <div class="metric-card" style="border-color: var(--border-cyan);">
+      <div class="metric-val" style="color: var(--border-cyan);">{{ stats.push_subscribers }}</div>
+      <div class="metric-lbl">Inscritos Push</div>
+    </div>
   </div>
 
   <!-- Admin Navigation Tabs -->
@@ -56,13 +60,16 @@
       [+ NOVO POST]
     </button>
     <button type="button" class="tab-btn {% if active_tab == 'submissions' %}active{% endif %}" data-tab="submissions">
-      [02. MODERAÇÃO LAB ({{ pending_submissions|length }} PENDENTES)]
+      [02. MODERACAO LAB ({{ pending_submissions|length }} PENDENTES)]
     </button>
     <button type="button" class="tab-btn {% if active_tab == 'comments' %}active{% endif %}" data-tab="comments">
-      [03. COMENTÁRIOS ({{ comments|length }})]
+      [03. COMENTARIOS ({{ comments|length }})]
     </button>
     <button type="button" class="tab-btn {% if active_tab == 'operators' %}active{% endif %}" data-tab="operators">
       [04. OPERADORES ({{ operators|length }})]
+    </button>
+    <button type="button" class="tab-btn {% if active_tab == 'push' %}active{% endif %}" data-tab="push">
+      [05. WEB PUSH ({{ stats.push_subscribers }})]
     </button>
   </div>
 
@@ -399,6 +406,141 @@
                 </td>
               </tr>
             {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: WEB PUSH NOTIFICATIONS -->
+  <div class="tab-pane" id="tab-push" style="display: {% if active_tab == 'push' %}block{% else %}none{% endif %};">
+    <!-- Status e Chaves -->
+    <div class="card-brutalist" style="border-color: var(--border-cyan); margin-bottom: 25px;">
+      <h3 style="font-family: var(--font-mono); color: var(--border-cyan); margin-bottom: 12px;">
+        STATUS DO PROTOCOLO WEB PUSH NATIVO
+      </h3>
+      <p style="font-family: var(--font-body); font-size: 0.9rem; margin-bottom: 15px; color: var(--text-muted);">
+        O sistema opera com criptografia VAPID direta entre o backend e os provedores de push dos navegadores (Google FCM, Mozilla). Zero custos, sem servicos de terceiros.
+      </p>
+      <div style="display: flex; gap: 20px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 0.85rem;">
+        <div>
+          <span style="color: var(--text-dim);">STATUS:</span>
+          <span style="color: var(--border-green); font-weight: bold; margin-left: 5px;">[VAPID OPERACIONAL]</span>
+        </div>
+        <div>
+          <span style="color: var(--text-dim);">ASSINANTES ATIVOS:</span>
+          <span style="color: var(--border-cyan); font-weight: bold; margin-left: 5px;">{{ stats.push_subscribers }}</span>
+        </div>
+        <div style="word-break: break-all;">
+          <span style="color: var(--text-dim);">CHAVE PUBLICA:</span>
+          <span style="color: var(--text-main); margin-left: 5px;">{{ vapid_public_key[:30] }}...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grade de Acoes: Disparo Manual e Resumo do Radar -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px; margin-bottom: 25px;">
+      <!-- Disparo Manual / Comunicado / Teste -->
+      <div class="card-brutalist">
+        <h3 style="font-family: var(--font-mono); color: var(--border-green); margin-bottom: 15px;">
+          DISPARO MANUAL OU TESTE
+        </h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+          Envie um comunicado geral ou execute um teste de entrega para todos os navegadores inscritos.
+        </p>
+
+        <form action="/admin/push/broadcast" method="POST">
+          <div class="form-group">
+            <label class="form-label" for="push_title">TITULO DA NOTIFICACAO:</label>
+            <input type="text" id="push_title" name="title" class="form-control" required placeholder="Ex: O Refugio: Artigo especial no ar" maxlength="100">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="push_body">MENSAGEM / CORPO:</label>
+            <textarea id="push_body" name="body" class="form-control" rows="3" required placeholder="Ex: Confira as reflexoes recentes sobre tecnologia e indie web." maxlength="250"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="push_url">URL DE DESTINO:</label>
+            <input type="text" id="push_url" name="target_url" class="form-control" value="/" required>
+          </div>
+
+          <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">
+            DISPARAR NOTIFICACAO AGORA &gt;&gt;
+          </button>
+        </form>
+      </div>
+
+      <!-- Resumo do Radar -->
+      <div class="card-brutalist" style="border-color: var(--border-amber);">
+        <h3 style="font-family: var(--font-mono); color: var(--border-amber); margin-bottom: 15px;">
+          RESUMO DIARIO DO RADAR
+        </h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+          A rotina automatica do sistema verifica o Radar periodicamente e envia no maximo uma vez ao dia. Voce tambem pode forcar o envio manual imediato aqui.
+        </p>
+
+        <div style="background: var(--bg-surface); border: 1px dashed var(--border-amber); padding: 15px; margin-bottom: 20px; font-family: var(--font-mono); font-size: 0.8rem;">
+          <div style="color: var(--text-dim); margin-bottom: 5px;">REGRAS DE DISPARO DO RADAR:</div>
+          <div>- Frequencia automatica: no maximo 1 envio a cada 24 horas</div>
+          <div>- Conteudo: compila os destaques de Tecnologia e Cultura</div>
+          <div>- Destino: direciona o leitor para /radar</div>
+        </div>
+
+        <form action="/admin/push/digest-now" method="POST">
+          <button type="submit" class="btn btn-secondary" style="width: 100%; border-color: var(--border-amber); color: var(--border-amber);">
+            FORCAR RESUMO DO RADAR AGORA &gt;&gt;
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Historico de Disparos -->
+    <div class="card-brutalist">
+      <h3 style="font-family: var(--font-mono); color: var(--border-cyan); margin-bottom: 20px;">
+        HISTORICO DE DISPAROS PUSH (ULTIMOS 15)
+      </h3>
+
+      <div style="overflow-x: auto;">
+        <table class="table-brutalist">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tipo</th>
+              <th>Titulo</th>
+              <th>Destinatarios</th>
+              <th>Entregas</th>
+              <th>Falhas</th>
+              <th>Data/Hora</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if push_logs and push_logs|length > 0 %}
+              {% for pl in push_logs %}
+                <tr>
+                  <td>#{{ pl.id }}</td>
+                  <td>
+                    <span class="badge-cat" style="margin: 0; {% if pl.notification_type == 'post' %}border-color: var(--border-green); color: var(--border-green);{% elif pl.notification_type == 'news_digest' %}border-color: var(--border-amber); color: var(--border-amber);{% else %}border-color: var(--border-cyan); color: var(--border-cyan);{% endif %}">
+                      {{ pl.notification_type|upper }}
+                    </span>
+                  </td>
+                  <td>
+                    <strong>{{ pl.title }}</strong>
+                    <div style="font-size: 0.75rem; color: var(--text-dim);">{{ pl.body }}</div>
+                  </td>
+                  <td>{{ pl.total_recipients }}</td>
+                  <td style="color: var(--border-green); font-weight: bold;">{{ pl.success_count }}</td>
+                  <td style="color: {% if pl.failure_count > 0 %}var(--border-pink){% else %}var(--text-dim){% endif %}; font-weight: bold;">{{ pl.failure_count }}</td>
+                  <td>{{ pl.sent_at|format_datetime }}</td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="7" style="text-align: center; color: var(--text-dim); padding: 30px;">
+                  Nenhum disparo registrado no sistema ate o momento.
+                </td>
+              </tr>
+            {% endif %}
           </tbody>
         </table>
       </div>

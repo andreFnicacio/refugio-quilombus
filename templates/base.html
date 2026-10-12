@@ -7,6 +7,8 @@
   
   <meta name="description" content="Espaço autoral, diário de bordo e laboratório open-source independente da era dos algoritmos.">
   
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="alternate icon" type="image/x-icon" href="/favicon.ico">
   <link rel="stylesheet" href="/static/css/style.css">
   {% block extra_head %}{% endblock %}
 </head>
@@ -108,7 +110,29 @@
 
   {% block modal %}{% endblock %}
 
+  <!-- Modal de Consentimento de Notificacoes (Neo-Brutalism & Retro) -->
+  <div id="push-consent-modal" class="push-consent-modal" style="display: none;">
+    <div class="push-consent-box">
+      <div class="push-consent-header">
+        <div class="push-consent-title">
+          <span class="push-pulse-dot"></span>
+          <span>[SISTEMA: SINAL DE TRANSMISSAO]</span>
+        </div>
+        <button id="push-consent-close" onclick="document.getElementById('push-consent-modal').style.display='none'" class="push-close-btn" title="Fechar">[X]</button>
+      </div>
+      <div class="push-consent-body">
+        <div class="push-consent-tagline">CANAL DIRETO // SEM ALGORITMOS PREDATORIOS</div>
+        <p>Deseja receber avisos imediatos no seu navegador quando sair um artigo novo ou o resumo diario de noticias do Radar?</p>
+      </div>
+      <div class="push-consent-actions">
+        <button id="push-consent-accept" class="push-action-btn btn-primary">[ SIM, ATIVAR NOTIFICACOES ]</button>
+        <button id="push-consent-decline" class="push-action-btn btn-secondary">[ AGORA NAO ]</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/js/main.js"></script>
+  <script src="/static/js/notifications.js"></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>
