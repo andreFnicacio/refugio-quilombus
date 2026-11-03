@@ -108,6 +108,7 @@ def build_backup_payload(db: Session) -> Dict[str, Any]:
             {
                 "id": c.id,
                 "post_id": c.post_id,
+                "post_slug": c.post.slug if c.post else None,
                 "user_id": c.user_id,
                 "author_name": c.author_name,
                 "author_email": _encrypt_sensitive(c.author_email),
@@ -249,7 +250,10 @@ def import_backup_from_json(
         db.flush()
 
         # 3. Posts
+        snapshot_post_id_to_slug = {}
         for p_item in data.get("posts", []):
+            if p_item.get("id") and p_item.get("slug"):
+                snapshot_post_id_to_slug[p_item["id"]] = p_item["slug"]
             existing_post = db.query(Post).filter(Post.slug == p_item["slug"]).first()
             if existing_post:
                 existing_post.title = p_item["title"]
@@ -275,21 +279,37 @@ def import_backup_from_json(
 
         # 4. Comments
         for c_item in data.get("comments", []):
-            post_exists = db.query(Post).filter(Post.id == c_item.get("post_id")).first()
-            if not post_exists:
+            target_slug = c_item.get("post_slug") or snapshot_post_id_to_slug.get(c_item.get("post_id"))
+            target_post = None
+            if target_slug:
+                target_post = db.query(Post).filter(Post.slug == target_slug).first()
+            if not target_post and c_item.get("post_id"):
+                target_post = db.query(Post).filter(Post.id == c_item.get("post_id")).first()
+            if not target_post:
                 continue
-            existing_comment = db.query(Comment).filter(Comment.id == c_item.get("id")).first()
+
+            existing_comment = None
+            if c_item.get("id"):
+                existing_comment = db.query(Comment).filter(Comment.id == c_item.get("id")).first()
+
             dec_c_email = _decrypt_sensitive(c_item.get("author_email")) or "anon@refugio.local"
-            if not existing_comment:
+            parsed_updated = _parse_dt(c_item.get("updated_at")) if c_item.get("updated_at") else None
+
+            if existing_comment:
+                existing_comment.content = c_item["content"]
+                existing_comment.notify_replies = bool(c_item.get("notify_replies", False))
+                if parsed_updated:
+                    existing_comment.updated_at = parsed_updated
+            else:
                 db.add(Comment(
-                    post_id=c_item["post_id"],
+                    post_id=target_post.id,
                     user_id=c_item.get("user_id"),
                     author_name=c_item["author_name"],
                     author_email=dec_c_email,
                     content=c_item["content"],
                     notify_replies=bool(c_item.get("notify_replies", False)),
                     created_at=_parse_dt(c_item.get("created_at")),
-                    updated_at=_parse_dt(c_item.get("updated_at")) if c_item.get("updated_at") else None
+                    updated_at=parsed_updated
                 ))
                 restored_counts["comments"] += 1
 

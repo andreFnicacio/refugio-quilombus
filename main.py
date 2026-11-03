@@ -381,6 +381,16 @@ def increment_site_visits(db: Session) -> int:
     return stat.value
 
 
+def _safe_redirect_path(path: Optional[str], default: str = "/diario") -> str:
+    """Garante redirecionamento apenas para rotas internas, bloqueando Open Redirect (ex: //evil.com)."""
+    if not path:
+        return default
+    cleaned = path.strip()
+    if not cleaned.startswith("/") or cleaned.startswith("//") or cleaned.startswith("/\\"):
+        return default
+    return cleaned
+
+
 def _get_comment_tokens_map(request: Request) -> dict[str, str]:
     raw = request.cookies.get(COMMENT_TOKENS_COOKIE)
     if not raw:
@@ -402,9 +412,7 @@ def can_user_edit_comment(
     if current_user:
         if getattr(current_user, "role", "user") == "admin":
             return True
-        if comment.user_id and comment.user_id == current_user.id:
-            return True
-        if comment.user_id is None and comment.author_name.lower() == current_user.username.lower():
+        if comment.user_id is not None and comment.user_id == current_user.id:
             return True
 
     if comment.edit_token:
@@ -546,8 +554,10 @@ def create_comment(
         resolved_name = clean_plain_text(author_name or "")
         resolved_email = (author_email or "").strip()
 
-    # Sanitiza conteúdo do comentário para evitar injeção de HTML bruto
-    cleaned_content = clean_plain_text(content)
+    # Sanitiza conteúdo do comentário para evitar injeção de HTML bruto e limita tamanho
+    cleaned_content = clean_plain_text(content)[:3000]
+    resolved_name = resolved_name[:100]
+    resolved_email = resolved_email[:150]
 
     if not resolved_name or not resolved_email or not cleaned_content:
         return RedirectResponse(
@@ -619,7 +629,7 @@ def edit_comment(
             detail="Você não possui permissão para editar este comentário."
         )
 
-    cleaned_content = clean_plain_text(content)
+    cleaned_content = clean_plain_text(content)[:3000]
     if not cleaned_content or len(cleaned_content) < 2:
         return RedirectResponse(
             url=f"/post/{slug}?msg=Conteudo+do+comentario+invalido#comment-{comment.id}",
@@ -891,7 +901,8 @@ def login_post(
 
     # Cria sessão com cookie assinado efêmero (Session Cookie puro)
     token = create_session_token(user.username)
-    target = next if (next and next.startswith("/")) else ("/admin" if user.is_admin else "/diario")
+    default_dest = "/admin" if user.is_admin else "/diario"
+    target = _safe_redirect_path(next, default=default_dest)
     if not user.is_admin and target.startswith("/admin"):
         target = "/diario"
 
@@ -1042,7 +1053,8 @@ def register_post(
     db.commit()
 
     token = create_session_token(new_user.username)
-    target = next if (next and next.startswith("/") and not next.startswith("/admin")) else "/diario"
+    safe_next = _safe_redirect_path(next, default="/diario")
+    target = safe_next if not safe_next.startswith("/admin") else "/diario"
     response = RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         key=settings.SESSION_COOKIE_NAME,
@@ -1111,7 +1123,7 @@ def mark_notification_read(
     notif.is_read = True
     db.commit()
 
-    target = notif.target_url if notif.target_url.startswith("/") else "/notifications"
+    target = _safe_redirect_path(notif.target_url, default="/notifications")
     return RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -1821,7 +1833,7 @@ async def admin_push_broadcast(
     """Dispara um comunicado ou teste manual para todos os navegadores inscritos."""
     clean_title = clean_plain_text(title)
     clean_body = clean_plain_text(body)
-    clean_url = target_url.strip() or "/"
+    clean_url = _safe_redirect_path(target_url, default="/")
 
     background_tasks.add_task(
         broadcast_notification,

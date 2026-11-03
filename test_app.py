@@ -1097,3 +1097,34 @@ def test_pirate_radio_page_api_and_admin_crud(client):
 
     del_res = client.post(f"/admin/radio/{tid}/delete", cookies=cookies, follow_redirects=False)
     assert del_res.status_code == 303
+
+
+def test_security_open_redirect_and_anonymous_comment_hijack_protection():
+    from main import _safe_redirect_path, can_user_edit_comment
+
+    # 1. Protecao contra Open Redirect protocol-relative (//evil.com ou /\evil.com)
+    assert _safe_redirect_path("//evil.com", default="/diario") == "/diario"
+    assert _safe_redirect_path("/\\evil.com", default="/diario") == "/diario"
+    assert _safe_redirect_path("https://evil.com", default="/diario") == "/diario"
+    assert _safe_redirect_path("/post/meu-artigo", default="/diario") == "/post/meu-artigo"
+
+    # 2. Comentario anonimo (user_id=None) NAO pode ser sequestrado por conta criada depois com mesmo nome
+    anon_comment = Comment(
+        id=99999,
+        post_id=1,
+        user_id=None,
+        author_name="visitante_antigo",
+        author_email="visitante@anon.org",
+        content="Comentário feito sem conta",
+        edit_token="secret_token_abc"
+    )
+    later_registered_user = User(
+        id=777,
+        username="visitante_antigo",
+        password_hash="hash",
+        role="user"
+    )
+    # Sem o token de edicao original, o usuario comum com mesmo nome nao pode editar
+    assert can_user_edit_comment(anon_comment, later_registered_user, {}) is False
+    # Com o token de edicao correto no cookie, o autor original pode editar
+    assert can_user_edit_comment(anon_comment, None, {"99999": "secret_token_abc"}) is True

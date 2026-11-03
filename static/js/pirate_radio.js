@@ -153,6 +153,23 @@
       ytLinkEl.href = `https://www.youtube.com/watch?v=${encodeURIComponent(track.youtube_id)}`;
     }
 
+    // Sincroniza também elementos da página /radio caso ela esteja aberta
+    const pageTitleEl = document.getElementById("radio-track-title");
+    const pageArtistEl = document.getElementById("radio-track-artist");
+    const pageCountryEl = document.getElementById("radio-track-country");
+    const pageGenreEl = document.getElementById("radio-track-genre");
+    const pageDescEl = document.getElementById("radio-track-desc");
+    const pageVideoIdLabel = document.getElementById("radio-video-id-label");
+    const pageYtExt = document.getElementById("radio-yt-external");
+
+    if (pageTitleEl) pageTitleEl.textContent = track.title;
+    if (pageArtistEl) pageArtistEl.textContent = track.artist;
+    if (pageCountryEl) pageCountryEl.textContent = track.country || "América Latina";
+    if (pageGenreEl) pageGenreEl.textContent = track.genre || "Protesto";
+    if (pageDescEl) pageDescEl.textContent = track.description || "Transmissão da Rádio Pirata O Refúgio.";
+    if (pageVideoIdLabel) pageVideoIdLabel.textContent = "ID: " + track.youtube_id;
+    if (pageYtExt) pageYtExt.href = `https://www.youtube.com/watch?v=${encodeURIComponent(track.youtube_id)}`;
+
     renderDrawerList();
   }
 
@@ -198,6 +215,15 @@
       } else {
         barEl.classList.remove("is-playing");
       }
+    }
+
+    const pageStatusEl = document.getElementById("radio-status-indicator");
+    const pagePlayBtn = document.getElementById("radio-play-btn");
+    if (pageStatusEl) {
+      pageStatusEl.textContent = playing ? "[STATUS: TRANSMITINDO NO AR]" : "[STATUS: TRANSMISSÃO EM PAUSA]";
+    }
+    if (pagePlayBtn) {
+      pagePlayBtn.textContent = playing ? "[⏸ PAUSAR TRANSMISSÃO]" : "[▶ TOCAR / RETOMAR]";
     }
 
     saveState();

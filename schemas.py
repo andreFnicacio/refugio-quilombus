@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, HttpUrl, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 # --- USER SCHEMAS ---
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
+    email: Optional[EmailStr] = None
 
 
 class UserCreate(UserBase):
@@ -14,10 +15,10 @@ class UserCreate(UserBase):
 
 class UserOut(UserBase):
     id: int
+    role: str = "user"
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- COMMENT SCHEMAS ---
@@ -35,10 +36,11 @@ class CommentCreate(CommentBase):
 class CommentOut(CommentBase):
     id: int
     post_id: int
+    user_id: Optional[int] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- POST SCHEMAS ---
@@ -68,8 +70,7 @@ class PostOut(PostBase):
     updated_at: datetime
     comments: List[CommentOut] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- COMMUNITY SUBMISSION SCHEMAS ---
@@ -93,8 +94,7 @@ class CommunitySubmissionOut(CommunitySubmissionBase):
     clicks_count: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- PUSH NOTIFICATION SCHEMAS ---

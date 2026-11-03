@@ -75,15 +75,23 @@
         </div>
       </div>
 
-      <!-- Monitor de Vídeo / Transmissão YouTube -->
+      <!-- Monitor de Vídeo / Transmissão YouTube (Sincronizado ao Player Lo-Fi Global) -->
       <div>
         <div class="video-embed-card" style="margin: 0; border-color: var(--border-amber); box-shadow: 5px 5px 0 var(--border-amber);">
           <div class="video-header-bar" style="border-color: var(--border-amber);">
-            <span class="video-header-tag" style="color: var(--border-amber);">[DECK // RECEPTOR AUDIOVISUAL]</span>
+            <span class="video-header-tag" style="color: var(--border-amber);">[SERVIÇO LO-FI GLOBAL // ÁUDIO CONTÍNUO]</span>
             <span class="video-header-id" id="radio-video-id-label">ID: --</span>
           </div>
-          <div style="position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000000;">
-            <div id="radio-yt-player" style="width: 100%; height: 100%;"></div>
+          <div style="padding: 28px 20px; background: #050811; text-align: center; font-family: var(--font-mono);">
+            <div style="color: var(--border-green); font-size: 0.9rem; font-weight: bold; margin-bottom: 10px;">
+              [TRANSMISSÃO EM SEGUNDO PLANO ATIVA NA BARRA INFERIOR]
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.8rem; line-height: 1.5; margin-bottom: 16px;">
+              A Rádio Pirata opera como um serviço Lo-Fi contínuo no rodapé do Refúgio. Você pode navegar livremente pelo Diário, Fóruns, Laboratório e Radar sem interromper a música!
+            </p>
+            <button type="button" onclick="document.getElementById('lofi-video-btn')?.click()" class="btn btn-amber" style="padding: 8px 14px; font-size: 0.78rem;">
+              [📺 MOSTRAR / OCULTAR MINI VÍDEO NO RODAPÉ]
+            </button>
           </div>
         </div>
       </div>
@@ -93,12 +101,12 @@
   <!-- Acervo & Playlist Completa de Músicas de Protesto -->
   <div style="margin-top: 40px;">
     <div class="section-label">
-      <span>[ACERVO DA TRINCHEIRA SONORA // AMÉRICA LATINA &amp; MUNDO] ({{ tracks|length }} FAIXAS)</span>
+      <span>[ACERVO DA TRINCHEIRA SONORA // CLÁSSICOS &amp; SAFRA 2026] ({{ tracks|length }} FAIXAS)</span>
     </div>
 
     <div class="submissions-grid" id="radio-playlist-grid">
       {% for track in tracks %}
-        <div class="submission-card radio-track-card" data-track-index="{{ loop.index0 }}" data-youtube-id="{{ track.youtube_id }}" id="track-card-{{ track.id }}">
+        <div class="submission-card radio-track-card" data-track-id="{{ track.id }}" data-youtube-id="{{ track.youtube_id }}" id="track-card-{{ track.id }}">
           <div>
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
               <span class="badge-cat" style="margin: 0; border-color: var(--border-amber); color: var(--border-amber);">
@@ -124,12 +132,12 @@
             <button
               type="button"
               class="btn btn-amber radio-select-track-btn"
-              data-index="{{ loop.index0 }}"
+              data-track-id="{{ track.id }}"
               style="padding: 6px 12px; font-size: 0.76rem; flex: 1; justify-content: center;"
             >
-              [▶ TOCAR ESTA FAIXA]
+              [▶ TOCAR ESTA FAIXA NO LO-FI]
             </button>
-            <a href="{{ track.youtube_url }}" target="_blank" rel="noopener noreferrer" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">
+            <a href="{{ track.youtube_url }}" target="_blank" rel="noopener noreferrer" data-no-pjax style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);">
               [YT]
             </a>
           </div>
@@ -141,190 +149,35 @@
 
 {% block extra_scripts %}
 <script>
-  (function() {
-    const PLAYLIST = {{ tracks_json | safe }};
-    if (!PLAYLIST || PLAYLIST.length === 0) return;
-
-    let currentIndex = Math.floor(Math.random() * PLAYLIST.length);
-    let shuffleEnabled = true;
-    let ytPlayer = null;
-    let isPlayerReady = false;
-    let historyStack = [currentIndex];
-
-    const titleEl = document.getElementById("radio-track-title");
-    const artistEl = document.getElementById("radio-track-artist");
-    const countryEl = document.getElementById("radio-track-country");
-    const genreEl = document.getElementById("radio-track-genre");
-    const descEl = document.getElementById("radio-track-desc");
-    const statusEl = document.getElementById("radio-status-indicator");
-    const modeEl = document.getElementById("radio-mode-indicator");
-    const videoIdLabel = document.getElementById("radio-video-id-label");
-    const ytExternalLink = document.getElementById("radio-yt-external");
-
+  document.addEventListener("DOMContentLoaded", () => {
     const playBtn = document.getElementById("radio-play-btn");
     const nextBtn = document.getElementById("radio-next-btn");
     const prevBtn = document.getElementById("radio-prev-btn");
-    const shuffleBtn = document.getElementById("radio-shuffle-btn");
-
-    function updateDeckDisplay(index, statusText) {
-      const track = PLAYLIST[index];
-      if (!track) return;
-
-      titleEl.textContent = track.title;
-      artistEl.textContent = track.artist;
-      countryEl.textContent = track.country;
-      genreEl.textContent = track.genre;
-      descEl.textContent = track.description || "Transmissão da Rádio Pirata O Refúgio.";
-      videoIdLabel.textContent = "ID: " + track.youtube_id;
-      ytExternalLink.href = track.youtube_url;
-      if (statusText) {
-        statusEl.textContent = statusText;
-      }
-
-      document.querySelectorAll(".radio-track-card").forEach((card, idx) => {
-        if (idx === index) {
-          card.style.borderColor = "var(--border-green)";
-          card.style.boxShadow = "5px 5px 0 var(--border-green)";
-        } else {
-          card.style.borderColor = "#334155";
-          card.style.boxShadow = "4px 4px 0 #000000";
-        }
-      });
-    }
-
-    function pickNextIndex() {
-      if (PLAYLIST.length <= 1) return 0;
-      if (!shuffleEnabled) {
-        return (currentIndex + 1) % PLAYLIST.length;
-      }
-      let candidate = currentIndex;
-      while (candidate === currentIndex) {
-        candidate = Math.floor(Math.random() * PLAYLIST.length);
-      }
-      return candidate;
-    }
-
-    function loadTrack(index, autoplay) {
-      currentIndex = index;
-      historyStack.push(index);
-      const track = PLAYLIST[currentIndex];
-      updateDeckDisplay(currentIndex, autoplay ? "[STATUS: TRANSMITINDO NO AR]" : "[STATUS: FAIXA SINTONIZADA]");
-
-      if (isPlayerReady && ytPlayer && typeof ytPlayer.loadVideoById === "function") {
-        if (autoplay) {
-          ytPlayer.loadVideoById(track.youtube_id);
-        } else {
-          ytPlayer.cueVideoById(track.youtube_id);
-        }
-      } else {
-        // Fallback direto via iframe caso a API externa demore ou esteja bloqueada
-        const container = document.getElementById("radio-yt-player");
-        if (container) {
-          const autoParam = autoplay ? 1 : 0;
-          container.innerHTML = `<iframe class="video-embed-iframe" style="width:100%;height:100%;min-height:240px;" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(track.youtube_id)}?autoplay=${autoParam}&rel=0&enablejsapi=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
-        }
-      }
-    }
-
-    // Inicializa o visor com a primeira faixa sorteada
-    updateDeckDisplay(currentIndex, "[STATUS: SINTONIZADO // PRONTO]");
-
-    // Carrega YouTube IFrame API
-    const tag = document.createElement("script");
-    tag.src = "https://www.youtube.com/iframe_api";
-    const firstScriptTag = document.getElementsByTagName("script")[0];
-    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-    window.onYouTubeIframeAPIReady = function() {
-      const initialTrack = PLAYLIST[currentIndex];
-      ytPlayer = new YT.Player("radio-yt-player", {
-        width: "100%",
-        height: "100%",
-        videoId: initialTrack.youtube_id,
-        host: "https://www.youtube-nocookie.com",
-        playerVars: {
-          autoplay: 0,
-          rel: 0,
-          modestbranding: 1
-        },
-        events: {
-          onReady: function() {
-            isPlayerReady = true;
-          },
-          onStateChange: function(event) {
-            if (event.data === YT.PlayerState.PLAYING) {
-              statusEl.textContent = "[STATUS: TRANSMITINDO NO AR]";
-              playBtn.textContent = "[⏸ PAUSAR TRANSMISSÃO]";
-            } else if (event.data === YT.PlayerState.PAUSED) {
-              statusEl.textContent = "[STATUS: TRANSMISSÃO EM PAUSA]";
-              playBtn.textContent = "[▶ RETOMAR TRANSMISSÃO]";
-            } else if (event.data === YT.PlayerState.ENDED) {
-              loadTrack(pickNextIndex(), true);
-            }
-          },
-          onError: function() {
-            // Se um vídeo tiver restrição de embed, pula automaticamente para a próxima faixa
-            loadTrack(pickNextIndex(), true);
-          }
-        }
-      });
-    };
 
     if (playBtn) {
       playBtn.addEventListener("click", () => {
-        if (isPlayerReady && ytPlayer && typeof ytPlayer.getPlayerState === "function") {
-          const state = ytPlayer.getPlayerState();
-          if (state === YT.PlayerState.PLAYING) {
-            ytPlayer.pauseVideo();
-          } else {
-            ytPlayer.playVideo();
-          }
-        } else {
-          loadTrack(currentIndex, true);
-        }
+        if (window.RefugioPirateRadio) window.RefugioPirateRadio.togglePlayPause();
       });
     }
-
     if (nextBtn) {
       nextBtn.addEventListener("click", () => {
-        loadTrack(pickNextIndex(), true);
+        if (window.RefugioPirateRadio) window.RefugioPirateRadio.playNextRandom();
       });
     }
-
     if (prevBtn) {
       prevBtn.addEventListener("click", () => {
-        if (historyStack.length > 1) {
-          historyStack.pop();
-          const prevIdx = historyStack.pop();
-          loadTrack(prevIdx, true);
-        } else {
-          const prevIdx = (currentIndex - 1 + PLAYLIST.length) % PLAYLIST.length;
-          loadTrack(prevIdx, true);
-        }
-      });
-    }
-
-    if (shuffleBtn) {
-      shuffleBtn.addEventListener("click", () => {
-        shuffleEnabled = !shuffleEnabled;
-        shuffleBtn.textContent = shuffleEnabled
-          ? "[SINTONIA ALEATÓRIA: ATIVA]"
-          : "[SINTONIA ALEATÓRIA: SEQUENCIAL]";
-        modeEl.textContent = shuffleEnabled
-          ? "[MODO: SHUFFLE LATINO]"
-          : "[MODO: ORDEM SEQUENCIAL]";
+        if (window.RefugioPirateRadio) window.RefugioPirateRadio.playPrevTrack();
       });
     }
 
     document.querySelectorAll(".radio-select-track-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const idx = parseInt(btn.getAttribute("data-index"), 10);
-        if (!isNaN(idx)) {
-          loadTrack(idx, true);
-          document.getElementById("pirate-radio-deck").scrollIntoView({ behavior: "smooth" });
+        const trackId = btn.getAttribute("data-track-id");
+        if (trackId && window.RefugioPirateRadio) {
+          window.RefugioPirateRadio.playTrackById(trackId);
         }
       });
     });
-  })();
+  });
 </script>
 {% endblock %}

@@ -12,6 +12,8 @@ services:
       - ./blog.db:/app/blog.db
       # Persistência dos uploads locais no host (evita perda de mídias ao recriar container)
       - ./static/uploads:/app/static/uploads
+      # Persistência dos snapshots JSON de backup no host
+      - ./backups:/app/backups
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

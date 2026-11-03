@@ -2,9 +2,10 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Instala curl para health check e dependências mínimas de build
+# Instala curl para health check, git para sync de backups e dependências mínimas
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copia e instala dependências Python
@@ -15,8 +16,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copia código da aplicação
 COPY . .
 
-# Garante pasta de uploads com permissões adequadas
-RUN mkdir -p /app/static/uploads
+# Garante pastas de uploads e backups com permissões adequadas
+RUN mkdir -p /app/static/uploads /app/backups
 
 EXPOSE 8000
 

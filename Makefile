@@ -1,4 +1,4 @@
-.PHONY: help setup venv run seed stats health superuser test clean
+.PHONY: help setup venv run seed stats health superuser backup restore test clean
 
 VENV = .venv
 PYTHON = $(VENV)/bin/python
@@ -17,7 +17,9 @@ help:
 	@echo "  make stats       - Exibe telemetria do monólito com arte Cyberpunk"
 	@echo "  make health      - Executa verificação de saúde do banco e serviços"
 	@echo "  make superuser   - Cria um novo usuário operador administrador"
-	@echo "  make test        - Roda os testes automatizados da aplicação"
+	@echo "  make backup      - Exporta snapshot JSON criptografado em backups/"
+	@echo "  make restore     - Restaura dados a partir do snapshot JSON"
+	@echo "  make test        - Roda toda a suíte de testes automatizados (pytest)"
 	@echo "  make clean       - Limpa caches e arquivos temporários"
 	@echo "=========================================================="
 
@@ -55,8 +57,14 @@ health:
 superuser:
 	@$(PYTHON) manage.py createsuperuser
 
+backup:
+	@$(PYTHON) manage.py backup
+
+restore:
+	@$(PYTHON) manage.py restore
+
 test:
-	@$(PYTHON) -m pytest -v test_app.py
+	@$(PYTHON) -m pytest -v test_app.py test_notifications.py
 
 clean:
 	@echo ">> Limpando caches..."
