@@ -71,6 +71,12 @@
     <button type="button" class="tab-btn {% if active_tab == 'push' %}active{% endif %}" data-tab="push">
       [05. WEB PUSH ({{ stats.push_subscribers }})]
     </button>
+    <button type="button" class="tab-btn {% if active_tab == 'backup' %}active{% endif %}" data-tab="backup">
+      [06. BACKUP &amp; GITHUB]
+    </button>
+    <button type="button" class="tab-btn {% if active_tab == 'radio' %}active{% endif %}" data-tab="radio">
+      [07. RADIO PIRATA ({{ stats.radio_tracks }})]
+    </button>
   </div>
 
   <!-- TAB 1: POSTS LIST -->
@@ -304,7 +310,7 @@
                       {{ comment.post.title[:30] }}...
                     </a>
                   </td>
-                  <td>{{ comment.content }}</td>
+                  <td>{{ comment.content | render_comment | safe }}</td>
                   <td>
                     <form action="/admin/comments/{{ comment.id }}/delete" method="POST" style="display: inline;" onsubmit="return confirm('Remover este comentário?');">
                       <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">EXCLUIR</button>
@@ -323,7 +329,7 @@
     </div>
   </div>
 
-  <!-- TAB 5: OPERADORES -->
+  <!-- TAB 5: OPERADORES & MEMBROS -->
   <div class="tab-pane" id="tab-operators" style="display: {% if active_tab == 'operators' %}block{% else %}none{% endif %};">
     <!-- Formulário de Recrutamento de Novo Operador -->
     <div class="card-brutalist" style="border-color: var(--border-green); margin-bottom: 30px;">
@@ -412,7 +418,7 @@
     </div>
   </div>
 
-  <!-- TAB 5: WEB PUSH NOTIFICATIONS -->
+  <!-- TAB 6: WEB PUSH NOTIFICATIONS -->
   <div class="tab-pane" id="tab-push" style="display: {% if active_tab == 'push' %}block{% else %}none{% endif %};">
     <!-- Status e Chaves -->
     <div class="card-brutalist" style="border-color: var(--border-cyan); margin-bottom: 25px;">
@@ -452,17 +458,17 @@
         <form action="/admin/push/broadcast" method="POST">
           <div class="form-group">
             <label class="form-label" for="push_title">TITULO DA NOTIFICACAO:</label>
-            <input type="text" id="push_title" name="title" class="form-control" required placeholder="Ex: O Refugio: Artigo especial no ar" maxlength="100">
+            <input type="text" id="push_title" name="title" class="form-input" required placeholder="Ex: O Refugio: Artigo especial no ar" maxlength="100">
           </div>
 
           <div class="form-group">
             <label class="form-label" for="push_body">MENSAGEM / CORPO:</label>
-            <textarea id="push_body" name="body" class="form-control" rows="3" required placeholder="Ex: Confira as reflexoes recentes sobre tecnologia e indie web." maxlength="250"></textarea>
+            <textarea id="push_body" name="body" class="form-textarea" rows="3" required placeholder="Ex: Confira as reflexoes recentes sobre tecnologia e indie web." maxlength="250"></textarea>
           </div>
 
           <div class="form-group">
             <label class="form-label" for="push_url">URL DE DESTINO:</label>
-            <input type="text" id="push_url" name="target_url" class="form-control" value="/" required>
+            <input type="text" id="push_url" name="target_url" class="form-input" value="/" required>
           </div>
 
           <button type="submit" class="btn" style="width: 100%; margin-top: 10px;">
@@ -488,7 +494,7 @@
         </div>
 
         <form action="/admin/push/digest-now" method="POST">
-          <button type="submit" class="btn btn-secondary" style="width: 100%; border-color: var(--border-amber); color: var(--border-amber);">
+          <button type="submit" class="btn btn-amber" style="width: 100%;">
             FORCAR RESUMO DO RADAR AGORA &gt;&gt;
           </button>
         </form>
@@ -541,6 +547,168 @@
                 </td>
               </tr>
             {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 7: BACKUP EM JSON & GITHUB SYNC -->
+  <div class="tab-pane" id="tab-backup" style="display: {% if active_tab == 'backup' %}block{% else %}none{% endif %};">
+    <div class="card-brutalist" style="border-color: var(--border-green); margin-bottom: 25px;">
+      <h3 style="font-family: var(--font-mono); color: var(--border-green); margin-bottom: 12px;">
+        [SISTEMA DE BACKUP EM JSON // INTEGRAÇÃO GIT &amp; GITHUB]
+      </h3>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 18px;">
+        Exporta todos os posts, comentários, submissões do Lab, faixas da Rádio Pirata e operadores em <code>backups/refugio_snapshot.json</code> com hashes e e-mails protegidos por criptografia Fernet (<code>SECRET_KEY</code>).
+      </p>
+
+      {% if backup_meta %}
+        <div style="background: #000000; border: 1px dashed var(--border-green); padding: 14px; margin-bottom: 20px; font-family: var(--font-mono); font-size: 0.8rem;">
+          <div style="color: var(--border-green); font-weight: bold; margin-bottom: 6px;">[SNAPSHOT ATUAL EM DISCO]:</div>
+          <div>- Gerado em: {{ backup_meta.exported_at }}</div>
+          <div>- SHA-256: {{ backup_meta.sha256_checksum }}</div>
+          {% if backup_meta.counts %}
+            <div>- Registros: {{ backup_meta.counts.posts }} posts | {{ backup_meta.counts.comments }} comentários | {{ backup_meta.counts.radio_tracks }} faixas | {{ backup_meta.counts.users }} usuários</div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+        <form action="/admin/backup/export" method="POST">
+          <button type="submit" class="btn">
+            [1. GERAR SNAPSHOT JSON LOCAL]
+          </button>
+        </form>
+
+        <a href="/admin/backup/download" class="btn btn-cyan">
+          [2. BAIXAR ARQUIVO JSON]
+        </a>
+
+        <form action="/admin/backup/git-push" method="POST">
+          <button type="submit" class="btn btn-amber">
+            [3. COMMIT &amp; PUSH PARA O GITHUB &gt;&gt;]
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card-brutalist" style="border-color: var(--border-cyan);">
+      <h3 style="font-family: var(--font-mono); color: var(--border-cyan); margin-bottom: 12px;">
+        [RESTAURAR DADOS A PARTIR DO BACKUP JSON]
+      </h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+        Envie um arquivo <code>.json</code> de snapshot ou clique diretamente em restaurar para reidratar o banco a partir de <code>backups/refugio_snapshot.json</code>.
+      </p>
+
+      <form action="/admin/backup/restore" method="POST" enctype="multipart/form-data">
+        <div class="form-group">
+          <label class="form-label" for="backup_file">Arquivo JSON de Snapshot (Opcional — usa o local se vazio)</label>
+          <input type="file" id="backup_file" name="backup_file" class="form-input" accept=".json,application/json">
+        </div>
+        <button type="submit" class="btn btn-cyan">
+          RESTAURAR DADOS DO SNAPSHOT &gt;&gt;
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- TAB 8: RÁDIO PIRATA (MÚSICAS DE PROTESTO) -->
+  <div class="tab-pane" id="tab-radio" style="display: {% if active_tab == 'radio' %}block{% else %}none{% endif %};">
+    <div class="card-brutalist" style="border-color: var(--border-pink); margin-bottom: 25px;">
+      <h3 style="font-family: var(--font-mono); color: var(--border-pink); margin-bottom: 15px;">
+        [+] ADICIONAR MÚSICA DE PROTESTO NA RÁDIO PIRATA
+      </h3>
+
+      <form action="/admin/radio/new" method="POST">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="radio_title">Título da Faixa *</label>
+            <input type="text" id="radio_title" name="title" class="form-input" placeholder="Ex: Cálice" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="radio_artist">Artista / Banda *</label>
+            <input type="text" id="radio_artist" name="artist" class="form-input" placeholder="Ex: Chico Buarque &amp; Milton Nascimento" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="radio_country">País / Região *</label>
+            <input type="text" id="radio_country" name="country" class="form-input" value="América Latina" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="radio_genre">Estilo Musical *</label>
+            <input type="text" id="radio_genre" name="genre" class="form-input" value="MPB / Protesto" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="radio_yt_url">URL do Vídeo no YouTube *</label>
+          <input type="text" id="radio_yt_url" name="youtube_url" class="form-input" placeholder="https://www.youtube.com/watch?v=..." required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="radio_desc">Contexto Histórico / Manifesto da Faixa</label>
+          <textarea id="radio_desc" name="description" class="form-textarea" style="min-height: 80px;" placeholder="Breve contexto sobre a importância desta música..."></textarea>
+        </div>
+
+        <button type="submit" class="btn">
+          ADICIONAR À PROGRAMAÇÃO DA RÁDIO &gt;&gt;
+        </button>
+      </form>
+    </div>
+
+    <div class="card-brutalist">
+      <h3 style="font-family: var(--font-mono); color: var(--border-amber); margin-bottom: 16px;">
+        PROGRAMAÇÃO ATUAL DA RÁDIO PIRATA ({{ radio_tracks|length }} FAIXAS)
+      </h3>
+
+      <div style="overflow-x: auto;">
+        <table class="table-brutalist">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Faixa / Artista</th>
+              <th>País / Estilo</th>
+              <th>YouTube ID</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tr in radio_tracks %}
+              <tr>
+                <td>#{{ tr.id }}</td>
+                <td>
+                  <strong>{{ tr.title }}</strong><br>
+                  <small style="color: var(--border-green);">{{ tr.artist }}</small>
+                </td>
+                <td>
+                  <span class="badge-cat" style="margin: 0;">{{ tr.country }}</span>
+                  <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">{{ tr.genre }}</div>
+                </td>
+                <td>
+                  <a href="{{ tr.youtube_url }}" target="_blank" rel="noopener noreferrer">{{ tr.youtube_id }}</a>
+                </td>
+                <td>
+                  {% if tr.is_active %}
+                    <span style="color: var(--border-green); font-weight: bold;">[NO AR]</span>
+                  {% else %}
+                    <span style="color: var(--text-dim);">[PAUSADA]</span>
+                  {% endif %}
+                </td>
+                <td style="white-space: nowrap;">
+                  <form action="/admin/radio/{{ tr.id }}/toggle" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-amber" style="padding: 4px 8px; font-size: 0.72rem;">
+                      {% if tr.is_active %}PAUSAR{% else %}ATIVAR{% endif %}
+                    </button>
+                  </form>
+                  <form action="/admin/radio/{{ tr.id }}/delete" method="POST" style="display: inline; margin-left: 4px;" onsubmit="return confirm('Remover esta música da Rádio Pirata?');">
+                    <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.72rem;">
+                      DEL
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>

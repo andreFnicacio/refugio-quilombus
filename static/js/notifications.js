@@ -1,5 +1,5 @@
-// Cliente de Notificacoes Web Push - O Refugio
-// Fluxo 100% via modal de consentimento neo-brutalista, sem botoes no cabecalho, sem emojis e sem rastreadores.
+// Cliente de Notificacoes Web Push & Alertas - O Refugio
+// Fluxo via modal neo-brutalista + controle de status no rodape, sem rastreadores externos.
 
 (function () {
     const STORAGE_KEY = "refugio_push_decision";
@@ -25,30 +25,81 @@
         return await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     }
 
+    function updateFooterPushBtn(stateText, isGranted) {
+        const btn = document.getElementById("footer-push-toggle");
+        if (!btn) return;
+        btn.textContent = stateText;
+        if (isGranted) {
+            btn.style.borderColor = "var(--border-green)";
+            btn.style.color = "var(--border-green)";
+            btn.style.boxShadow = "3px 3px 0 var(--border-green)";
+        }
+    }
+
+    async function createOrSyncPushSubscription(reg) {
+        const resKey = await fetch("/api/push/vapid-public-key");
+        if (!resKey.ok) return null;
+        const keyData = await resKey.json();
+        const convertedKey = urlBase64ToUint8Array(keyData.public_key);
+
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+            try {
+                sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: convertedKey
+                });
+            } catch (subErr) {
+                // Caso haja chave VAPID antiga travada, limpa e tenta novamente
+                const stale = await reg.pushManager.getSubscription();
+                if (stale) {
+                    await stale.unsubscribe();
+                }
+                sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: convertedKey
+                });
+            }
+        }
+
+        if (!sub) return null;
+
+        const rawSub = sub.toJSON();
+        const payload = {
+            endpoint: rawSub.endpoint,
+            p256dh: rawSub.keys.p256dh,
+            auth: rawSub.keys.auth,
+            user_agent: navigator.userAgent
+        };
+
+        await fetch("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        updateFooterPushBtn("[SINAL PUSH: ATIVO NO NAVEGADOR]", true);
+        return sub;
+    }
+
     async function syncSubscriptionIfGranted() {
-        if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-        if (Notification.permission !== "granted") return;
+        if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+            updateFooterPushBtn("[SINAL PUSH: INDISPONIVEL]", false);
+            return;
+        }
+        if (Notification.permission === "denied") {
+            updateFooterPushBtn("[SINAL PUSH: BLOQUEADO NO NAVEGADOR]", false);
+            return;
+        }
+        if (Notification.permission !== "granted") {
+            updateFooterPushBtn("[SINAL PUSH: ATIVAR NOTIFICACOES]", false);
+            return;
+        }
 
         try {
             const reg = await getRegistration();
             if (!reg) return;
-            const sub = await reg.pushManager.getSubscription();
-            if (!sub) return;
-
-            // Garante que o endpoint esta registrado no backend
-            const rawSub = sub.toJSON();
-            const payload = {
-                endpoint: rawSub.endpoint,
-                p256dh: rawSub.keys.p256dh,
-                auth: rawSub.keys.auth,
-                user_agent: navigator.userAgent
-            };
-
-            await fetch("/api/push/subscribe", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+            await createOrSyncPushSubscription(reg);
         } catch (e) {
             console.debug("[Push] Falha ao sincronizar assinatura existente:", e);
         }
@@ -65,7 +116,7 @@
             return true;
         }
 
-        // Se o usuario ja bloqueou ou ja permitiu no Chrome, nao exibe o modal
+        // Se o usuario ja bloqueou ou ja permitiu no navegador, nao exibe o modal automatico
         if (Notification.permission === "denied" || Notification.permission === "granted") {
             return false;
         }
@@ -114,41 +165,12 @@
             const permission = await Notification.requestPermission();
             if (permission !== "granted") {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify({ choice: permission, timestamp: Date.now() }));
+                updateFooterPushBtn("[SINAL PUSH: NAO AUTORIZADO]", false);
                 closeConsentModal();
                 return;
             }
 
-            // Busca chave publica VAPID do backend
-            const resKey = await fetch("/api/push/vapid-public-key");
-            if (!resKey.ok) {
-                console.error("[Push] Falha ao obter chave publica VAPID.");
-                closeConsentModal();
-                return;
-            }
-            const keyData = await resKey.json();
-            const convertedKey = urlBase64ToUint8Array(keyData.public_key);
-
-            // Cria assinatura no PushManager
-            const subscription = await reg.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: convertedKey
-            });
-
-            // Persiste no backend
-            const rawSub = subscription.toJSON();
-            const payload = {
-                endpoint: rawSub.endpoint,
-                p256dh: rawSub.keys.p256dh,
-                auth: rawSub.keys.auth,
-                user_agent: navigator.userAgent
-            };
-
-            await fetch("/api/push/subscribe", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-
+            await createOrSyncPushSubscription(reg);
             localStorage.setItem(STORAGE_KEY, JSON.stringify({ choice: "granted", timestamp: Date.now() }));
             closeConsentModal();
         } catch (err) {
@@ -167,11 +189,12 @@
         // Sincroniza em background caso ja esteja ativo
         syncSubscriptionIfGranted();
 
-        // Configura botoes do modal de consentimento
+        // Configura botoes do modal de consentimento e do rodape
         const modal = document.getElementById("push-consent-modal");
         const acceptBtn = document.getElementById("push-consent-accept");
         const declineBtn = document.getElementById("push-consent-decline");
         const closeBtn = document.getElementById("push-consent-close");
+        const footerBtn = document.getElementById("footer-push-toggle");
 
         if (acceptBtn) {
             acceptBtn.addEventListener("click", (e) => {
@@ -194,6 +217,17 @@
             });
         }
 
+        if (footerBtn) {
+            footerBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                if ("Notification" in window && Notification.permission === "granted") {
+                    syncSubscriptionIfGranted();
+                } else {
+                    showConsentModal();
+                }
+            });
+        }
+
         if (modal) {
             modal.addEventListener("click", (e) => {
                 if (e.target === modal) {
@@ -205,6 +239,7 @@
         // Helper para depuracao no console
         window.refugioPush = {
             show: showConsentModal,
+            sync: syncSubscriptionIfGranted,
             reset: () => {
                 localStorage.removeItem(STORAGE_KEY);
                 showConsentModal();

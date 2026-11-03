@@ -52,12 +52,62 @@
     {% if post.comments %}
       <div class="comments-list" style="margin-bottom: 40px;">
         {% for comment in post.comments %}
-          <div class="comment-card">
-            <div class="comment-header">
-              <span class="comment-author">&gt; {{ comment.author_name }}</span>
-              <span style="color: var(--text-dim);">{{ comment.created_at|format_datetime }}</span>
+          <div class="comment-card" id="comment-{{ comment.id }}">
+            <div class="comment-header" style="flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <span class="comment-author">&gt; {{ comment.author_name }}</span>
+                {% if comment.user_id %}
+                  <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--border-cyan); border: 1px solid var(--border-cyan); padding: 1px 5px;">[MEMBRO VERIFICADO]</span>
+                {% endif %}
+                {% if comment.updated_at %}
+                  <span class="comment-edited-badge" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--border-amber);">
+                    [EDITADO EM {{ comment.updated_at|format_datetime }}]
+                  </span>
+                {% endif %}
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="color: var(--text-dim);">{{ comment.created_at|format_datetime }}</span>
+                {% if editable_comment_ids and comment.id in editable_comment_ids %}
+                  <button
+                    type="button"
+                    class="btn btn-amber btn-edit-comment"
+                    style="padding: 2px 8px; font-size: 0.7rem; box-shadow: 2px 2px 0 var(--border-amber);"
+                    onclick="const box = document.getElementById('edit-comment-form-{{ comment.id }}'); box.style.display = (box.style.display === 'none' ? 'block' : 'none');"
+                  >
+                    [EDITAR]
+                  </button>
+                {% endif %}
+              </div>
             </div>
-            <p style="color: #cbd5e1; font-size: 0.95rem; white-space: pre-line;">{{ comment.content }}</p>
+
+            <div class="comment-body" style="color: #cbd5e1; font-size: 0.95rem; white-space: pre-line; word-break: break-word;">{{ comment.content | render_comment | safe }}</div>
+
+            {% if editable_comment_ids and comment.id in editable_comment_ids %}
+              <div id="edit-comment-form-{{ comment.id }}" style="display: none; margin-top: 14px; padding-top: 14px; border-top: 1px dashed #334155;">
+                <form action="/post/{{ post.slug }}/comment/{{ comment.id }}/edit" method="POST">
+                  <div class="form-group" style="margin-bottom: 10px;">
+                    <label class="form-label" for="edit-content-{{ comment.id }}" style="color: var(--border-amber); font-size: 0.78rem;">
+                      [EDITAR SUA MENSAGEM // SUPORTA HIPERLINKS https:// E [Texto](https://...)]
+                    </label>
+                    <textarea id="edit-content-{{ comment.id }}" name="content" class="form-textarea" style="min-height: 90px;" required>{{ comment.content }}</textarea>
+                  </div>
+                  <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-amber" style="padding: 6px 12px; font-size: 0.78rem;">
+                      SALVAR EDIÇÃO &gt;&gt;
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      style="padding: 6px 12px; font-size: 0.78rem;"
+                      onclick="document.getElementById('edit-comment-form-{{ comment.id }}').style.display='none';"
+                    >
+                      CANCELAR
+                    </button>
+                  </div>
+                </form>
+              </div>
+            {% endif %}
           </div>
         {% endfor %}
       </div>
@@ -71,9 +121,20 @@
 
     <!-- Comment Form -->
     <div class="card-brutalist" id="comment-box" style="border-color: var(--border-green);">
-      <h3 style="font-family: var(--font-mono); color: var(--border-green); margin-bottom: 20px;">
-        [DEIXAR UMA RESPOSTA NO TERMINAL]
-      </h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
+        <h3 style="font-family: var(--font-mono); color: var(--border-green); margin: 0;">
+          [DEIXAR UMA RESPOSTA NO TERMINAL]
+        </h3>
+        {% if current_user %}
+          <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--border-cyan);">
+            [CONECTADO COMO: <strong>@{{ current_user.username }}</strong>]
+          </span>
+        {% else %}
+          <a href="/login?next=/post/{{ post.slug }}" style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--border-cyan);">
+            [ENTRAR COM CONTA PARA EDITAR DE QUALQUER DISPOSITIVO &gt;&gt;]
+          </a>
+        {% endif %}
+      </div>
 
       <form action="/post/{{ post.slug }}/comment" method="POST">
         <!-- Honeypot Anti-Spam (invisível para humanos, atrai bots) -->
@@ -85,18 +146,44 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
           <div class="form-group">
             <label class="form-label" for="author_name">Seu Nome / Codinome *</label>
-            <input type="text" id="author_name" name="author_name" class="form-input" placeholder="Ex: Neo, Kenshin" required>
+            <input
+              type="text"
+              id="author_name"
+              name="author_name"
+              class="form-input"
+              placeholder="Ex: Neo, Kenshin"
+              value="{{ current_user.username if current_user else '' }}"
+              {% if current_user %}readonly style="border-color: var(--border-cyan); color: var(--border-cyan);"{% endif %}
+              required
+            >
           </div>
 
           <div class="form-group">
             <label class="form-label" for="author_email">Seu E-mail * (não será exibido)</label>
-            <input type="email" id="author_email" name="author_email" class="form-input" placeholder="seu@email.com" required>
+            <input
+              type="email"
+              id="author_email"
+              name="author_email"
+              class="form-input"
+              placeholder="seu@email.com"
+              value="{{ (current_user.email or (current_user.username ~ '@refugio.local')) if current_user else '' }}"
+              required
+            >
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="content">Mensagem *</label>
-          <textarea id="content" name="content" class="form-textarea" placeholder="Deixe sua reflexão, crítica ou saudação..." required></textarea>
+          <label class="form-label" for="content">
+            Mensagem * <small style="color: var(--text-dim); font-weight: normal;">(Suporta Hiperlinks: cole URLs https://... ou use [Texto](https://...))</small>
+          </label>
+          <textarea id="content" name="content" class="form-textarea" placeholder="Deixe sua reflexão, crítica, saudação ou link de referência..." required></textarea>
+        </div>
+
+        <div class="form-group" style="display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-main);">
+          <input type="checkbox" id="notify_replies" name="notify_replies" value="true" checked style="width: 16px; height: 16px; accent-color: var(--border-green); cursor: pointer;">
+          <label for="notify_replies" style="cursor: pointer;">
+            [SINAL DE RESPOSTA]: Receber notificação (Central de Alertas &amp; Web Push) quando comentarem neste tópico
+          </label>
         </div>
 
         <button type="submit" class="btn">

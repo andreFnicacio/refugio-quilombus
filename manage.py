@@ -9,9 +9,15 @@ from rich import box
 from datetime import datetime
 
 from database import SessionLocal, engine, Base
-from models import User, Post, CommunitySubmission, Comment, SiteStat
+from models import User, Post, CommunitySubmission, Comment, SiteStat, RadioTrack
 from auth import hash_password
 from init_db import init_database
+from backup_service import (
+    DEFAULT_BACKUP_JSON_PATH,
+    export_backup_to_json,
+    import_backup_from_json,
+    git_commit_and_push_backup
+)
 from config import settings
 
 app = typer.Typer(
@@ -40,7 +46,7 @@ def print_banner():
         SAMURAI_SKULL_ASCII.strip(),
         border_style="#00ff66",
         box=box.HEAVY,
-        subtitle="[bold #ffb000]v1.0.0 // IndieWeb Monolith[/]"
+        subtitle="[bold #ffb000]v1.3.0 // IndieWeb Monolith[/]"
     ))
 
 
@@ -83,6 +89,7 @@ def createsuperuser(
         user = User(
             username=username.strip(),
             password_hash=hash_password(password),
+            role="admin",
             created_at=datetime.now()
         )
         db.add(user)
@@ -90,6 +97,34 @@ def createsuperuser(
         console.print(f"[bold #00ff66]✔ Usuário administrador '{username}' forjado com sucesso![/]")
     finally:
         db.close()
+
+
+@app.command()
+def backup(
+    git_push: bool = typer.Option(False, "--git-push", "-g", help="Faz git commit e push do backup JSON")
+):
+    """Exporta snapshot dos dados em JSON (e opcionalmente faz commit/push no Git)."""
+    print_banner()
+    if git_push:
+        res = git_commit_and_push_backup()
+        console.print(f"[bold #00ff66]✔ {res['message']}[/]")
+    else:
+        payload = export_backup_to_json()
+        counts = payload["metadata"]["counts"]
+        console.print(
+            f"[bold #00ff66]✔ Backup JSON salvo em {DEFAULT_BACKUP_JSON_PATH} "
+            f"({counts['posts']} posts, {counts['comments']} comentários, {counts['radio_tracks']} faixas).[/]"
+        )
+
+
+@app.command()
+def restore(
+    path: str = typer.Option(DEFAULT_BACKUP_JSON_PATH, "--path", "-f", help="Caminho do arquivo JSON")
+):
+    """Restaura os dados do banco a partir do snapshot JSON."""
+    print_banner()
+    restored = import_backup_from_json(path)
+    console.print(f"[bold #00ff66]✔ Backup restaurado com sucesso: {restored}[/]")
 
 
 @app.command()
@@ -103,6 +138,7 @@ def stats():
         total_subs = db.query(CommunitySubmission).count()
         pending_subs = db.query(CommunitySubmission).filter(CommunitySubmission.status == "pending").count()
         approved_subs = db.query(CommunitySubmission).filter(CommunitySubmission.status == "approved").count()
+        total_tracks = db.query(RadioTrack).count()
         visit_stat = db.query(SiteStat).filter(SiteStat.key == "total_visits").first()
         total_visits = visit_stat.value if visit_stat else 0
 
@@ -115,6 +151,7 @@ def stats():
         table.add_row("Projetos no Lab (Total)", str(total_subs))
         table.add_row("Projetos Aprovados", str(approved_subs))
         table.add_row("Projetos Pendentes de Moderação", str(pending_subs))
+        table.add_row("Faixas na Rádio Pirata", str(total_tracks))
         table.add_row("Contador Digital de Visitas", str(total_visits))
 
         console.print(table)

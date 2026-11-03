@@ -3,7 +3,7 @@ import json
 import base64
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Union
 
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from py_vapid import Vapid
@@ -11,7 +11,7 @@ import pywebpush
 from sqlalchemy.orm import Session
 
 from config import settings
-from models import PushSubscription, PushLog, Post
+from models import PushSubscription, PushLog, Post, Comment, User, Notification
 from database import SessionLocal
 
 logger = logging.getLogger("refugio.push")
@@ -106,7 +106,8 @@ def register_subscription(
     endpoint: str,
     p256dh: str,
     auth: str,
-    user_agent: Optional[str] = None
+    user_agent: Optional[str] = None,
+    user_id: Optional[int] = None
 ) -> PushSubscription:
     """Registra ou atualiza um endpoint de notificacao."""
     sub = db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
@@ -115,8 +116,11 @@ def register_subscription(
         sub.auth = auth
         if user_agent:
             sub.user_agent = user_agent[:255]
+        if user_id is not None:
+            sub.user_id = user_id
     else:
         sub = PushSubscription(
+            user_id=user_id,
             endpoint=endpoint,
             p256dh=p256dh,
             auth=auth,
@@ -187,15 +191,24 @@ def broadcast_notification(
     title: str,
     body: str,
     target_url: str,
-    notification_type: str = "manual"
+    notification_type: str = "manual",
+    target_user_ids: Optional[List[int]] = None
 ) -> Dict[str, Any]:
     """
-    Dispara uma notificacao para todas as assinaturas ativas no banco.
+    Dispara uma notificacao para assinaturas ativas no banco.
+    Se target_user_ids for informado e houver inscritos vinculados, prioriza-os;
+    caso contrario envia para as assinaturas ativas.
     Remove automaticamente endpoints obsoletos (404/410) e registra log.
     """
     db = SessionLocal()
     try:
-        subscriptions = db.query(PushSubscription).all()
+        query = db.query(PushSubscription)
+        if target_user_ids is not None:
+            targeted = query.filter(PushSubscription.user_id.in_(target_user_ids)).all()
+            subscriptions = targeted if targeted else query.all()
+        else:
+            subscriptions = query.all()
+
         total = len(subscriptions)
         now = datetime.now()
         if total == 0:
@@ -225,14 +238,14 @@ def broadcast_notification(
             "url": target_url,
             "icon": "/static/favicon.ico",
             "badge": "/static/favicon.ico",
-            "timestamp": int(datetime.now().timestamp() * 1000)
+            "tag": f"refugio-{notification_type}-{int(now.timestamp())}",
+            "timestamp": int(now.timestamp() * 1000)
         }
 
         success_count = 0
         failure_count = 0
         to_delete_endpoints = []
 
-        now = datetime.now()
         for sub in subscriptions:
             success, err = send_single_push(sub, payload)
             if success:
@@ -281,17 +294,118 @@ def broadcast_notification(
         db.close()
 
 
-def send_post_push_notification(post: Post):
+def send_post_push_notification(post: Union[Post, int]):
     """Dispara notificacao automatica para um novo post do blog."""
-    clean_title = f"Novo post: {post.title}"
-    body = (post.content[:140] + "...") if len(post.content) > 140 else post.content
-    target_url = f"/post/{post.slug}"
+    db = SessionLocal()
+    try:
+        post_obj = db.query(Post).filter(Post.id == post).first() if isinstance(post, int) else post
+        if not post_obj:
+            return
+        clean_title = f"Novo post: {post_obj.title}"
+        body = (post_obj.content[:140] + "...") if len(post_obj.content) > 140 else post_obj.content
+        target_url = f"/post/{post_obj.slug}"
+    finally:
+        db.close()
+
     broadcast_notification(
         title=clean_title,
         body=body,
         target_url=target_url,
         notification_type="post"
     )
+
+
+def notify_new_comment(post_id: int, comment_id: int) -> Dict[str, Any]:
+    """
+    Cria notificacoes In-App (Central de Alertas) e dispara Web Push
+    quando um post/forum recebe um novo comentario.
+    Destinatarios:
+      1. Autor do post e operadores (admins), exceto se forem o proprio autor do comentario.
+      2. Usuarios que comentaram anteriormente no mesmo post com notify_replies=True.
+    """
+    db = SessionLocal()
+    try:
+        post = db.query(Post).filter(Post.id == post_id).first()
+        comment = db.query(Comment).filter(Comment.id == comment_id).first()
+        if not post or not comment:
+            return {"in_app_created": 0, "push": None}
+
+        recipient_user_ids = set()
+
+        # 1. Autor do post
+        if post.author_id and post.author_id != comment.user_id:
+            recipient_user_ids.add(post.author_id)
+
+        # 2. Administradores / Operadores
+        admins = db.query(User).filter(User.role == "admin").all()
+        for adm in admins:
+            if adm.id != comment.user_id and adm.username.lower() != comment.author_name.lower():
+                recipient_user_ids.add(adm.id)
+
+        # 3. Participantes da thread com notify_replies=True
+        prev_comments = (
+            db.query(Comment)
+            .filter(
+                Comment.post_id == post.id,
+                Comment.id != comment.id,
+                Comment.notify_replies == True
+            )
+            .all()
+        )
+        for prev in prev_comments:
+            if prev.user_id and prev.user_id != comment.user_id:
+                recipient_user_ids.add(prev.user_id)
+            else:
+                # Tenta localizar usuario pelo email ou username caso tenha comentado antes de logar
+                matched_user = (
+                    db.query(User)
+                    .filter(
+                        (User.email == prev.author_email) | (User.username == prev.author_name)
+                    )
+                    .first()
+                )
+                if matched_user and matched_user.id != comment.user_id and matched_user.username.lower() != comment.author_name.lower():
+                    recipient_user_ids.add(matched_user.id)
+
+        target_url = f"/post/{post.slug}#comment-{comment.id}"
+        notif_title = f"Nova resposta em: {post.title[:80]}"
+        snippet = (comment.content[:120] + "...") if len(comment.content) > 120 else comment.content
+        notif_msg = f"@{comment.author_name} comentou: \"{snippet}\""
+
+        created_count = 0
+        now = datetime.now()
+        for uid in recipient_user_ids:
+            notif = Notification(
+                user_id=uid,
+                post_id=post.id,
+                comment_id=comment.id,
+                title=notif_title,
+                message=notif_msg,
+                target_url=target_url,
+                is_read=False,
+                created_at=now
+            )
+            db.add(notif)
+            created_count += 1
+
+        db.commit()
+        target_ids_list = list(recipient_user_ids)
+    except Exception as e:
+        logger.error(f"[NOTIFY COMMENT] Erro ao gerar notificacoes de comentario: {e}")
+        db.rollback()
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+    # Dispara Web Push para os inscritos
+    push_res = broadcast_notification(
+        title=notif_title,
+        body=notif_msg,
+        target_url=target_url,
+        notification_type="comment",
+        target_user_ids=target_ids_list if target_ids_list else None
+    )
+    return {"in_app_created": created_count, "push": push_res}
 
 
 def check_and_send_daily_news_digest(force: bool = False) -> bool:

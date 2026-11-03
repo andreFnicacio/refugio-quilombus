@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Central de Alertas // O Refúgio{% endblock %}
+
+{% block content %}
+  <div class="lab-header" style="border-color: var(--border-amber); box-shadow: 5px 5px 0 var(--border-amber);">
+    <div>
+      <span class="badge-cat" style="border-color: var(--border-amber); color: var(--border-amber);">
+        [TERMINAL // NOTIFICAÇÕES DE FÓRUNS E COMENTÁRIOS]
+      </span>
+      <h1 style="font-family: var(--font-mono); font-size: 1.7rem; color: #ffffff; margin-top: 6px;">
+        CENTRAL DE ALERTAS (@{{ current_user.username|upper }})
+      </h1>
+      <p style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+        Acompanhe respostas diretas nos tópicos que você participa ou administra.
+      </p>
+    </div>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      {% if unread_count > 0 %}
+        <form action="/notifications/read-all" method="POST">
+          <button type="submit" class="btn btn-amber" style="font-size: 0.8rem;">
+            [MARCAR TODOS COMO LIDOS ({{ unread_count }})]
+          </button>
+        </form>
+      {% endif %}
+      <a href="/diario" class="btn" style="font-size: 0.8rem;">
+        &lt;&lt; VOLTAR AO DIÁRIO
+      </a>
+    </div>
+  </div>
+
+  {% if notifications and notifications|length > 0 %}
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      {% for notif in notifications %}
+        <div class="card-brutalist" style="margin-bottom: 0; padding: 18px; border-color: {% if not notif.is_read %}var(--border-amber){% else %}#334155{% endif %}; box-shadow: 4px 4px 0 {% if not notif.is_read %}var(--border-amber){% else %}#000{% endif %};">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap;">
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-family: var(--font-mono); font-size: 0.78rem;">
+                {% if not notif.is_read %}
+                  <span class="badge-cat" style="margin: 0; border-color: var(--border-pink); color: var(--border-pink); box-shadow: none;">
+                    [NOVO ALERTA]
+                  </span>
+                {% else %}
+                  <span style="color: var(--text-dim);">[LIDO]</span>
+                {% endif %}
+                <span style="color: var(--text-dim);">{{ notif.created_at|format_datetime }}</span>
+              </div>
+              <h3 style="font-family: var(--font-mono); font-size: 1.05rem; color: #ffffff; margin-bottom: 6px;">
+                {{ notif.title }}
+              </h3>
+              <p style="font-family: var(--font-body); font-size: 0.92rem; color: #cbd5e1;">
+                {{ notif.message }}
+              </p>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <form action="/notifications/{{ notif.id }}/read" method="POST">
+                <button type="submit" class="btn {% if not notif.is_read %}btn-amber{% else %}btn-cyan{% endif %}" style="padding: 6px 12px; font-size: 0.78rem;">
+                  VER NO FÓRUM &gt;&gt;
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card-brutalist" style="text-align: center; padding: 40px 20px;">
+      <p style="font-family: var(--font-pixel); font-size: 0.9rem; color: var(--border-green); margin-bottom: 12px;">
+        [SINAL LIMPO // ZERO ALERTAS PENDENTES]
+      </p>
+      <p style="font-family: var(--font-mono); font-size: 0.88rem; color: var(--text-muted);">
+        Quando alguém comentar em um post seu ou responder a um tópico que você segue, o alerta aparecerá aqui.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}

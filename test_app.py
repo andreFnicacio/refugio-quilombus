@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from main import app
 from database import SessionLocal
-from models import User, Post, CommunitySubmission, Comment, SiteStat
+from models import User, Post, CommunitySubmission, Comment, SiteStat, Notification, RadioTrack
 from config import settings
 
 
@@ -776,3 +776,324 @@ def test_lab_simple64_n64_emulator_resource(client):
 
 
 
+
+def test_user_registration_login_and_admin_isolation(client):
+    import uuid
+    from main import limiter
+    limiter._limiter.storage.reset()
+
+    unique_user = f"membro_{uuid.uuid4().hex[:6]}"
+    unique_email = f"{unique_user}@refugio.org"
+    pwd = "senhaUser123"
+
+    # 1. Acessa pagina de cadastro
+    resp_reg_page = client.get("/register")
+    assert resp_reg_page.status_code == 200
+    assert "FORJAR IDENTIDADE NO REFÚGIO" in resp_reg_page.text
+
+    # 2. Cadastra novo usuario comum (role='user')
+    resp_reg = client.post(
+        "/register",
+        data={
+            "username": unique_user,
+            "email": unique_email,
+            "password": pwd,
+            "confirm_password": pwd,
+            "website_hp": ""
+        },
+        follow_redirects=False
+    )
+    assert resp_reg.status_code == 303
+    assert settings.SESSION_COOKIE_NAME in resp_reg.cookies
+
+    user_cookies = {settings.SESSION_COOKIE_NAME: resp_reg.cookies[settings.SESSION_COOKIE_NAME]}
+
+    # 3. Usuario comum NAO pode acessar /admin (retorna 403 Forbidden)
+    resp_admin_attempt = client.get("/admin", cookies=user_cookies)
+    assert resp_admin_attempt.status_code == 403
+
+    # 4. Usuario comum pode acessar /notifications e /diario
+    resp_notif = client.get("/notifications", cookies=user_cookies)
+    assert resp_notif.status_code == 200
+    assert unique_user.upper() in resp_notif.text
+
+    # Limpeza
+    db = SessionLocal()
+    u = db.query(User).filter(User.username == unique_user).first()
+    if u:
+        db.delete(u)
+        db.commit()
+    db.close()
+
+
+def test_comment_hyperlinks_and_xss_protection():
+    from main import render_comment_content
+
+    raw = (
+        "Confira o projeto em https://github.com/torvalds/linux e também "
+        "[Documentação Oficial](https://fastapi.tiangolo.com/pt/). "
+        "<script>alert('xss')</script> [Malicioso](javascript:alert(1))"
+    )
+    rendered = render_comment_content(raw)
+    assert '<a href="https://github.com/torvalds/linux"' in rendered
+    assert 'class="comment-link"' in rendered
+    assert '<a href="https://fastapi.tiangolo.com/pt/"' in rendered
+    assert ">Documentação Oficial</a>" in rendered
+    assert "<script>" not in rendered
+    assert 'href="javascript:' not in rendered
+
+
+def test_comment_editing_and_authorization(client):
+    import uuid
+    from main import limiter
+    limiter._limiter.storage.reset()
+
+    db = SessionLocal()
+    post = db.query(Post).first()
+    slug = post.slug
+    db.close()
+
+    # 1. Cria usuario e faz comentario autenticado
+    uname = f"editor_{uuid.uuid4().hex[:6]}"
+    reg_res = client.post(
+        "/register",
+        data={
+            "username": uname,
+            "email": f"{uname}@test.io",
+            "password": "password123",
+            "confirm_password": "password123",
+            "website_hp": ""
+        },
+        follow_redirects=False
+    )
+    user_cookies = {settings.SESSION_COOKIE_NAME: reg_res.cookies[settings.SESSION_COOKIE_NAME]}
+
+    comment_res = client.post(
+        f"/post/{slug}/comment",
+        data={
+            "author_name": uname,
+            "author_email": f"{uname}@test.io",
+            "content": "Comentário original com link https://indieweb.org",
+            "notify_replies": "true",
+            "website_hp": ""
+        },
+        cookies=user_cookies,
+        follow_redirects=False
+    )
+    assert comment_res.status_code == 303
+
+    db = SessionLocal()
+    created_comment = (
+        db.query(Comment)
+        .filter(Comment.author_name == uname)
+        .order_by(Comment.id.desc())
+        .first()
+    )
+    assert created_comment is not None
+    assert created_comment.notify_replies is True
+    cid = created_comment.id
+    db.close()
+
+    try:
+        # 2. Autor edita seu proprio comentario
+        edit_res = client.post(
+            f"/post/{slug}/comment/{cid}/edit",
+            data={"content": "Comentário EDITADO com [Novo Link](https://python.org)"},
+            cookies=user_cookies,
+            follow_redirects=True
+        )
+        assert edit_res.status_code == 200
+        assert "Comentário EDITADO" in edit_res.text
+        assert 'href="https://python.org"' in edit_res.text
+        assert "[EDITADO EM" in edit_res.text
+
+        # 3. Visitante sem permissao tenta editar comentario alheio -> 403
+        client.cookies.clear()
+        unauth_edit = client.post(
+            f"/post/{slug}/comment/{cid}/edit",
+            data={"content": "Tentativa de invasão"},
+            follow_redirects=False
+        )
+        assert unauth_edit.status_code == 403
+    finally:
+        client.cookies.clear()
+        db = SessionLocal()
+        try:
+            db.query(Comment).filter(Comment.id == cid).delete()
+            db.query(User).filter(User.username == uname).delete()
+            db.commit()
+        finally:
+            db.close()
+
+
+def test_comment_notifications_in_app_and_web_push(client):
+    import uuid
+    from unittest.mock import patch
+    from main import limiter
+    limiter._limiter.storage.reset()
+
+    db = SessionLocal()
+    post = db.query(Post).first()
+    slug = post.slug
+    db.close()
+
+    # Cria Usuario A (que vai comentar primeiro e pedir notificacao)
+    user_a = f"user_a_{uuid.uuid4().hex[:5]}"
+    res_a = client.post(
+        "/register",
+        data={
+            "username": user_a,
+            "email": f"{user_a}@refugio.io",
+            "password": "password123",
+            "confirm_password": "password123"
+        },
+        follow_redirects=False
+    )
+    cookies_a = {settings.SESSION_COOKIE_NAME: res_a.cookies[settings.SESSION_COOKIE_NAME]}
+
+    # Cria Usuario B (que vai responder na mesma thread)
+    user_b = f"user_b_{uuid.uuid4().hex[:5]}"
+    res_b = client.post(
+        "/register",
+        data={
+            "username": user_b,
+            "email": f"{user_b}@refugio.io",
+            "password": "password123",
+            "confirm_password": "password123"
+        },
+        follow_redirects=False
+    )
+    cookies_b = {settings.SESSION_COOKIE_NAME: res_b.cookies[settings.SESSION_COOKIE_NAME]}
+
+    try:
+        with patch("push_service.send_single_push", return_value=(True, None)):
+            # Usuario A comenta com notify_replies=true
+            client.post(
+                f"/post/{slug}/comment",
+                data={
+                    "author_name": user_a,
+                    "author_email": f"{user_a}@refugio.io",
+                    "content": "Alguém mais curte Vagabond?",
+                    "notify_replies": "true"
+                },
+                cookies=cookies_a,
+                follow_redirects=False
+            )
+
+            # Usuario B comenta em seguida no mesmo post
+            client.post(
+                f"/post/{slug}/comment",
+                data={
+                    "author_name": user_b,
+                    "author_email": f"{user_b}@refugio.io",
+                    "content": "Sim, obra-prima do Takehiko Inoue!",
+                    "notify_replies": "true"
+                },
+                cookies=cookies_b,
+                follow_redirects=False
+            )
+
+        # Verifica que o Usuario A recebeu alerta In-App na rota /api/notifications/unread e /notifications
+        unread_res = client.get("/api/notifications/unread", cookies=cookies_a)
+        assert unread_res.status_code == 200
+        unread_data = unread_res.json()
+        assert unread_data["unread_count"] >= 1
+        assert any(user_b in item["message"] for item in unread_data["items"])
+
+        # Marca como lido
+        notif_id = unread_data["items"][0]["id"]
+        read_res = client.post(f"/notifications/{notif_id}/read", cookies=cookies_a, follow_redirects=False)
+        assert read_res.status_code == 303
+    finally:
+        client.cookies.clear()
+        db = SessionLocal()
+        try:
+            db.query(Comment).filter(Comment.author_name.in_([user_a, user_b])).delete(synchronize_session=False)
+            u_objs = db.query(User).filter(User.username.in_([user_a, user_b])).all()
+            for u_obj in u_objs:
+                db.query(Notification).filter(Notification.user_id == u_obj.id).delete()
+                db.delete(u_obj)
+            db.commit()
+        finally:
+            db.close()
+
+
+def test_backup_json_export_import_and_git_sync(client, tmp_path):
+    from backup_service import export_backup_to_json, import_backup_from_json
+    from auth import create_session_token
+
+    temp_json = str(tmp_path / "test_snapshot.json")
+    payload = export_backup_to_json(output_path=temp_json)
+    assert "metadata" in payload
+    assert "data" in payload
+    assert payload["metadata"]["counts"]["posts"] >= 1
+    assert payload["metadata"]["counts"]["radio_tracks"] >= 1
+
+    # Garante que password_hash foi criptografado com prefixo enc:
+    for u in payload["data"]["users"]:
+        assert u["password_hash"].startswith("enc:")
+
+    # Testa importacao idempotente
+    restored = import_backup_from_json(temp_json)
+    assert restored["posts"] >= 1
+
+    # Testa rota de download do admin
+    token = create_session_token(settings.ADMIN_USERNAME)
+    cookies = {settings.SESSION_COOKIE_NAME: token}
+    dl_res = client.get("/admin/backup/download", cookies=cookies)
+    assert dl_res.status_code == 200
+    assert dl_res.json()["metadata"]["app"] == "O Refúgio"
+
+
+def test_pirate_radio_page_api_and_admin_crud(client):
+    from auth import create_session_token
+    from models import RadioTrack
+
+    # 1. Testa que o servico global Lo-Fi de Rádio Pirata fica disponivel de fundo na Home/Diario sem obrigar ir na aba /radio
+    resp_home = client.get("/")
+    assert resp_home.status_code == 200
+    assert 'id="lofi-pirate-radio-bar"' in resp_home.text
+    assert '/static/js/pirate_radio.js' in resp_home.text
+    assert 'data-lofi-era="classics"' in resp_home.text
+    assert 'data-lofi-era="2026"' in resp_home.text
+    assert '[05. RÁDIO PIRATA]' not in resp_home.text
+
+    # 2. Testa endpoint JSON /api/radio/playlist com faixas Clássicas e Safra 2026
+    resp_api = client.get("/api/radio/playlist")
+    assert resp_api.status_code == 200
+    data = resp_api.json()
+    assert data["total"] >= 20
+    assert any(t["title"] == "Apesar de Você" and "Clássico" in t["genre"] for t in data["tracks"])
+    assert any("2026" in t["genre"] for t in data["tracks"])
+    assert any("This Is Not America" in t["title"] for t in data["tracks"])
+    assert any(t["title"] == "Tierra Zanta" for t in data["tracks"])
+    assert any(t["title"] == "Antipatriarca" for t in data["tracks"])
+
+    # 3. Testa adicao e remocao de faixa pelo Admin
+    token = create_session_token(settings.ADMIN_USERNAME)
+    cookies = {settings.SESSION_COOKIE_NAME: token}
+
+    add_res = client.post(
+        "/admin/radio/new",
+        data={
+            "title": "Cálice",
+            "artist": "Chico Buarque & Gilberto Gil",
+            "country": "Brasil",
+            "genre": "Clássico // MPB Protesto (1973)",
+            "youtube_url": "https://www.youtube.com/watch?v=9y2xB90A0CY",
+            "description": "Clássico contra a censura."
+        },
+        cookies=cookies,
+        follow_redirects=False
+    )
+    assert add_res.status_code == 303
+
+    db = SessionLocal()
+    added_track = db.query(RadioTrack).filter(RadioTrack.title == "Cálice").first()
+    assert added_track is not None
+    assert added_track.youtube_id == "9y2xB90A0CY"
+    tid = added_track.id
+    db.close()
+
+    del_res = client.post(f"/admin/radio/{tid}/delete", cookies=cookies, follow_redirects=False)
+    assert del_res.status_code == 303

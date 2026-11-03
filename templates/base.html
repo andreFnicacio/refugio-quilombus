@@ -34,7 +34,9 @@
       <span id="ticker-clock">[TIME: --:--:-- UTC]</span>
     </div>
     <div class="ticker-item">
-      <span>[UPTIME: 99.98%]</span>
+      <button type="button" id="ticker-radio-toggle" style="background: none; border: none; color: var(--border-amber); font-family: var(--font-mono); font-size: inherit; font-weight: bold; cursor: pointer; padding: 0;">
+        [99.9 FM: RÁDIO PIRATA ▶ TOCAR]
+      </button>
     </div>
   </div>
 
@@ -63,15 +65,23 @@
           [04. RADAR]
         </a>
         {% if current_user %}
-          <a href="/admin" class="nav-btn admin-btn {% if '/admin' in request.url.path %}active{% endif %}">
-            [05. ADMIN]
+          <a href="/notifications" id="nav-notifications-btn" class="nav-btn {% if '/notifications' in request.url.path %}active{% endif %}" style="{% if current_user.unread_notifications_count and current_user.unread_notifications_count > 0 %}border-color: var(--border-amber); color: var(--border-amber); box-shadow: 3px 3px 0 var(--border-amber);{% endif %}" title="Central de Alertas e Respostas nos Fóruns">
+            [ALERTAS: <span id="nav-unread-count">{{ current_user.unread_notifications_count or 0 }}</span>]
           </a>
-          <a href="/logout" class="nav-btn btn-danger" title="Encerrar sessão">
-            [SAIR]
+          {% if current_user.is_admin %}
+            <a href="/admin" class="nav-btn admin-btn {% if '/admin' in request.url.path %}active{% endif %}">
+              [ADMIN]
+            </a>
+          {% endif %}
+          <a href="/logout" class="nav-btn btn-danger" title="Conectado como @{{ current_user.username }} — Clique para sair">
+            [SAIR @{{ current_user.username|upper }}]
           </a>
         {% else %}
-          <a href="/login" class="nav-btn" title="Área administrativa">
-            [OPERADOR]
+          <a href="/login" class="nav-btn {% if '/login' in request.url.path %}active{% endif %}" title="Entrar com sua conta ou operador">
+            [ENTRAR]
+          </a>
+          <a href="/register" class="nav-btn {% if '/register' in request.url.path %}active{% endif %}" style="border-color: var(--border-cyan); color: var(--border-cyan); box-shadow: 3px 3px 0 var(--border-cyan);" title="Criar conta na comunidade">
+            [CADASTRO]
           </a>
         {% endif %}
       </nav>
@@ -92,12 +102,20 @@
     </div>
   </main>
 
-  <!-- Footer with Digital Odometer -->
+  <!-- Footer with Digital Odometer & Push Signal Control -->
   <footer class="site-footer">
     <div class="container footer-content">
       <div>
         <p><strong>O REFÚGIO</strong> &bull; Espaço pessoal e autoral.</p>
         <p style="margin-top: 4px;">Construído com FastAPI, SQLite e sem algoritmos predatórios. 2026.</p>
+        <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+          <button type="button" id="footer-push-toggle" class="btn btn-cyan" style="padding: 4px 10px; font-size: 0.72rem;">
+            [SINAL PUSH: VERIFICAR / ATIVAR]
+          </button>
+          <button type="button" id="footer-radio-toggle" class="btn btn-amber" style="padding: 4px 10px; font-size: 0.72rem;">
+            [SINTONIZAR RÁDIO PIRATA LO-FI]
+          </button>
+        </div>
       </div>
 
       <!-- Odômetro Digital de Visitas -->
@@ -111,6 +129,73 @@
       </div>
     </div>
   </footer>
+
+  <!-- ========================================================================
+       SERVIÇO GLOBAL EM SEGUNDO PLANO: RÁDIO PIRATA LO-FI (CLÁSSICOS + 2026)
+       ======================================================================== -->
+  <div id="lofi-pirate-radio-bar" class="lofi-radio-dock">
+    <!-- Popover de Vídeo Opcional (Fica invisível/1x1 por padrão para tocar apenas áudio em segundo plano) -->
+    <div id="lofi-video-popover" class="lofi-video-popover">
+      <div class="lofi-video-popover-header">
+        <span>[SINAL DE VÍDEO // YOUTUBE STREAM]</span>
+        <a id="lofi-yt-external" href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" data-no-pjax style="color: var(--border-cyan); font-size: 0.7rem;">[ABRIR NO YT ↗]</a>
+      </div>
+      <div class="lofi-yt-frame-wrapper">
+        <div id="lofi-yt-mount"></div>
+      </div>
+    </div>
+
+    <!-- Gaveta de Playlist Rápida (Permite escolher faixas sem sair da página atual) -->
+    <div id="lofi-playlist-drawer" class="lofi-playlist-drawer" style="display: none;">
+      <div class="lofi-drawer-header">
+        <div>
+          <strong style="color: var(--border-pink);">[ACERVO RÁDIO PIRATA // CLÁSSICOS &amp; SAFRA 2026]</strong>
+          <span id="lofi-drawer-count" style="margin-left: 8px; color: var(--border-amber); font-size: 0.72rem;">20 FAIXAS</span>
+        </div>
+        <button type="button" id="lofi-drawer-close" class="lofi-ctrl-btn" style="padding: 2px 8px;">[FECHAR X]</button>
+      </div>
+      <div id="lofi-drawer-list" class="lofi-drawer-list"></div>
+    </div>
+
+    <!-- Barra Principal do Player Lo-Fi -->
+    <div class="lofi-dock-inner container">
+      <!-- Info da Estação + Equalizador + Faixa Atual -->
+      <div class="lofi-station-info">
+        <div class="lofi-station-badges">
+          <span id="lofi-status-badge" class="lofi-status-badge">[STANDBY // 99.9 FM]</span>
+          <span id="lofi-era-badge" class="lofi-era-tag era-classic">[CLÁSSICO]</span>
+          <div id="lofi-eq" class="lofi-eq" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="lofi-track-box">
+          <div id="lofi-track-title" class="lofi-track-title">Sintonizando Rádio Pirata Lo-Fi...</div>
+          <div id="lofi-track-meta" class="lofi-track-meta">[América Latina &amp; Mundo] // Clássicos Históricos &amp; Protesto 2026</div>
+        </div>
+      </div>
+
+      <!-- Filtros de Era (Todas / Clássicos / 2026) -->
+      <div class="lofi-era-filters" title="Filtrar época das músicas de protesto">
+        <button type="button" class="lofi-era-btn active" data-lofi-era="all">[TODAS]</button>
+        <button type="button" class="lofi-era-btn" data-lofi-era="classics">[CLÁSSICOS]</button>
+        <button type="button" class="lofi-era-btn" data-lofi-era="2026">[SAFRA 2026]</button>
+      </div>
+
+      <!-- Controles de Reprodução em Segundo Plano -->
+      <div class="lofi-controls">
+        <button type="button" id="lofi-prev-btn" class="lofi-ctrl-btn" title="Faixa anterior">[⏮]</button>
+        <button type="button" id="lofi-play-btn" class="lofi-ctrl-btn lofi-play-main" title="Tocar ou pausar rádio de fundo">[▶ TOCAR LO-FI]</button>
+        <button type="button" id="lofi-next-btn" class="lofi-ctrl-btn" title="Sortear próxima música de protesto">[⏭ SORTEAR]</button>
+        <div class="lofi-volume-wrap" title="Volume da Rádio Lo-Fi">
+          <span style="font-size: 0.7rem; color: var(--text-dim);">VOL</span>
+          <input type="range" id="lofi-volume" min="0" max="100" value="80" class="lofi-volume-slider">
+        </div>
+        <button type="button" id="lofi-playlist-btn" class="lofi-ctrl-btn" title="Ver lista de músicas (Clássicas e 2026)">[📜 FAIXAS]</button>
+        <button type="button" id="lofi-video-btn" class="lofi-ctrl-btn" title="Mostrar/ocultar mini vídeo do YouTube">[📺 VÍDEO]</button>
+        <button type="button" id="lofi-minimize-btn" class="lofi-ctrl-btn lofi-min-btn" title="Minimizar ou expandir player">[▼ MINIMIZAR]</button>
+      </div>
+    </div>
+  </div>
 
   {% block modal %}{% endblock %}
 
@@ -126,7 +211,7 @@
       </div>
       <div class="push-consent-body">
         <div class="push-consent-tagline">CANAL DIRETO // SEM ALGORITMOS PREDATORIOS</div>
-        <p>Deseja receber avisos imediatos no seu navegador quando sair um artigo novo ou o resumo diario de noticias do Radar?</p>
+        <p>Deseja receber avisos imediatos no seu navegador quando sair um artigo novo, respostas nos fóruns ou o resumo diario de noticias do Radar?</p>
       </div>
       <div class="push-consent-actions">
         <button id="push-consent-accept" class="push-action-btn btn-primary">[ SIM, ATIVAR NOTIFICACOES ]</button>
@@ -137,6 +222,7 @@
 
   <script src="/static/js/main.js"></script>
   <script src="/static/js/notifications.js"></script>
+  <script src="/static/js/pirate_radio.js"></script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

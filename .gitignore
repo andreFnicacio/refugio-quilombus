@@ -8,6 +8,7 @@ __pycache__/
 .DS_Store
 static/uploads/*
 !static/uploads/.gitkeep
-backups/
+backups/*
+!backups/refugio_snapshot.json
 *.pem
 encrypted.data

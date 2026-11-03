@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastro de Membro // O Refúgio{% endblock %}
+
+{% block content %}
+  <div style="max-width: 520px; margin: 40px auto;">
+    <div class="card-brutalist" style="border-color: var(--border-cyan); box-shadow: 6px 6px 0 var(--border-cyan);">
+      <div style="text-align: center; margin-bottom: 25px;">
+        <span style="font-family: var(--font-pixel); font-size: 1.6rem; color: var(--border-cyan); display: block; margin-bottom: 10px;">
+          [+USER]
+        </span>
+        <h2 style="font-family: var(--font-mono); font-size: 1.25rem; color: #ffffff;">
+          [FORJAR IDENTIDADE NO REFÚGIO]
+        </h2>
+        <p style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim); margin-top: 6px;">
+          Crie sua conta para comentar nos fóruns, editar suas mensagens e receber alertas de respostas.
+        </p>
+      </div>
+
+      {% if error %}
+        <div style="background: #2b000f; border: 2px solid var(--border-pink); color: var(--border-pink); font-family: var(--font-mono); font-size: 0.85rem; padding: 10px; margin-bottom: 20px;">
+          &gt;&gt; {{ error }}
+        </div>
+      {% endif %}
+
+      <form action="/register" method="POST">
+        <input type="hidden" name="next" value="{{ next or '/diario' }}">
+
+        <!-- Honeypot Anti-Spam -->
+        <div class="hp-field">
+          <label for="website_hp_reg">Não preencha se for humano:</label>
+          <input type="text" name="website_hp" id="website_hp_reg" autocomplete="off" tabindex="-1">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg_username">&gt; CODINOME / USUÁRIO *</label>
+          <input type="text" id="reg_username" name="username" class="form-input" placeholder="Ex: neo_samurai" required minlength="3" maxlength="30" pattern="[a-zA-Z0-9_-]+" autofocus>
+          <small style="font-family: var(--font-mono); color: var(--text-dim); font-size: 0.72rem;">Apenas letras, números, hífen (-) e underline (_).</small>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg_email">&gt; E-MAIL (OPCIONAL — PARA VÍNCULO DE ALERTAS)</label>
+          <input type="email" id="reg_email" name="email" class="form-input" placeholder="voce@dominio.org">
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="reg_password">&gt; SENHA *</label>
+            <input type="password" id="reg_password" name="password" class="form-input" placeholder="Mínimo 6 caracteres" required minlength="6">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="reg_confirm_password">&gt; CONFIRMAR SENHA *</label>
+            <input type="password" id="reg_confirm_password" name="confirm_password" class="form-input" placeholder="Repita a senha" required minlength="6">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-cyan" style="width: 100%; justify-content: center; margin-top: 10px;">
+          REGISTRAR IDENTIDADE &gt;&gt;
+        </button>
+      </form>
+
+      <div style="margin-top: 25px; border-top: 1px dashed #334155; padding-top: 15px; text-align: center;">
+        <p style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">
+          Já possui credencial? <a href="/login?next={{ next or '/diario' }}" style="font-weight: bold;">[ENTRAR NO TERMINAL &gt;&gt;]</a>
+        </p>
+      </div>
+    </div>
+  </div>
+{% endblock %}

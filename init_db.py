@@ -2,30 +2,282 @@ import logging
 from datetime import datetime
 from sqlalchemy import inspect, text
 from database import engine, SessionLocal, Base
-from models import User, Post, CommunitySubmission, Comment, SiteStat, PushSubscription, PushLog
+from models import (
+    User,
+    Post,
+    CommunitySubmission,
+    Comment,
+    SiteStat,
+    PushSubscription,
+    PushLog,
+    Notification,
+    RadioTrack
+)
 from auth import hash_password
 from config import settings
 
 logger = logging.getLogger("refugio.init_db")
 
 
-def _ensure_schema_migrations():
-    """Adds nullable columns missing from existing SQLite tables (create_all won't ALTER)."""
-    inspector = inspect(engine)
-    if "posts" not in inspector.get_table_names():
-        return
+DEFAULT_PROTEST_TRACKS = [
+    # --- CLÁSSICOS HISTÓRICOS DA AMÉRICA LATINA & MUNDO ---
+    {
+        "title": "Apesar de Você",
+        "artist": "Chico Buarque",
+        "country": "Brasil",
+        "genre": "Clássico 1970 // MPB de Protesto",
+        "youtube_id": "tj_sU3uGFXk",
+        "youtube_url": "https://www.youtube.com/watch?v=tj_sU3uGFXk",
+        "description": "Composta em 1970, driblou a censura e se tornou o maior símbolo musical da luta pela redemocratização no Brasil."
+    },
+    {
+        "title": "Pra Não Dizer Que Não Falei das Flores",
+        "artist": "Geraldo Vandré",
+        "country": "Brasil",
+        "genre": "Clássico 1968 // Canção de Protesto",
+        "youtube_id": "1KskJDDW93k",
+        "youtube_url": "https://www.youtube.com/watch?v=1KskJDDW93k",
+        "description": "Hino histórico de 1968 que convocou a resistência civil ('Quem sabe faz a hora, não espera acontecer')."
+    },
+    {
+        "title": "Como Nossos Pais",
+        "artist": "Elis Regina & Belchior",
+        "country": "Brasil",
+        "genre": "Clássico 1976 // MPB",
+        "youtube_id": "LfCDkut_j9M",
+        "youtube_url": "https://www.youtube.com/watch?v=LfCDkut_j9M",
+        "description": "Reflexão geracional sobre resistência política, inconformismo e a urgência de manter a transformação viva."
+    },
+    {
+        "title": "El Derecho de Vivir en Paz",
+        "artist": "Víctor Jara",
+        "country": "Chile",
+        "genre": "Clássico 1971 // Nueva Canción Chilena",
+        "youtube_id": "XkXise2bHE0",
+        "youtube_url": "https://www.youtube.com/watch?v=XkXise2bHE0",
+        "description": "Obra imortal de Víctor Jara que ecoou nas ruas do Chile e de toda a América Latina pelo direito à paz e soberania."
+    },
+    {
+        "title": "El Pueblo Unido Jamás Será Vencido",
+        "artist": "Inti-Illimani & Quilapayún",
+        "country": "Chile",
+        "genre": "Clássico 1973 // Canto Popular Latino",
+        "youtube_id": "K3AcdMdwL70",
+        "youtube_url": "https://www.youtube.com/watch?v=K3AcdMdwL70",
+        "description": "O cântico de união popular mais traduzido da história latino-americana."
+    },
+    {
+        "title": "Todo Cambia",
+        "artist": "Mercedes Sosa",
+        "country": "Argentina",
+        "genre": "Clássico 1984 // Folclore Sul-Americano",
+        "youtube_id": "0khKL3tTOTs",
+        "youtube_url": "https://www.youtube.com/watch?v=0khKL3tTOTs",
+        "description": "Na voz de 'La Negra' Mercedes Sosa, um manifesto poético sobre exílio, mudança e amor inabalável à América Latina."
+    },
+    {
+        "title": "Ojalá",
+        "artist": "Silvio Rodríguez",
+        "country": "Cuba",
+        "genre": "Clássico 1978 // Nueva Trova",
+        "youtube_id": "u3quFCVY6Ug",
+        "youtube_url": "https://www.youtube.com/watch?v=u3quFCVY6Ug",
+        "description": "Clássico da Nueva Trova Latino-Americana sobre memória, libertação e superação de tempos sombrios."
+    },
+    {
+        "title": "El Baile de los que Sobran",
+        "artist": "Los Prisioneros",
+        "country": "Chile",
+        "genre": "Clássico 1986 // Rock Latino",
+        "youtube_id": "uPJrZFBiy-A",
+        "youtube_url": "https://www.youtube.com/watch?v=uPJrZFBiy-A",
+        "description": "Crítica contundente à desigualdade educacional e social imposta à juventude trabalhadora latino-americana."
+    },
+    {
+        "title": "Diário de um Detento",
+        "artist": "Racionais MC's",
+        "country": "Brasil",
+        "genre": "Clássico 1997 // Rap Nacional",
+        "youtube_id": "dGFxdmuDA4A",
+        "youtube_url": "https://www.youtube.com/watch?v=dGFxdmuDA4A",
+        "description": "Relato visceral sobre o massacre do Carandiru e a realidade das periferias e do sistema carcerário brasileiro."
+    },
+    {
+        "title": "Gimme Tha Power",
+        "artist": "Molotov",
+        "country": "México",
+        "genre": "Clássico 1997 // Rap Rock",
+        "youtube_id": "9YI4aqaVSg0",
+        "youtube_url": "https://www.youtube.com/watch?v=9YI4aqaVSg0",
+        "description": "Denúncia explosiva contra a corrupção política, o abuso de poder e a desigualdade na América Latina."
+    },
+    {
+        "title": "Um Bom Lugar",
+        "artist": "Sabotage",
+        "country": "Brasil",
+        "genre": "Clássico 2000 // Rap Nacional",
+        "youtube_id": "GA7LcSX8tYE",
+        "youtube_url": "https://www.youtube.com/watch?v=GA7LcSX8tYE",
+        "description": "Hino imortal do Maestro do Canão sobre sobrevivência, dignidade e resistência na periferia."
+    },
+    {
+        "title": "Latinoamérica",
+        "artist": "Calle 13 (part. Totó la Momposina, Susana Baca & Maria Rita)",
+        "country": "Porto Rico / América Latina",
+        "genre": "Clássico 2010 // Rap & Folclore Latino",
+        "youtube_id": "DkFJE8ZdeG8",
+        "youtube_url": "https://www.youtube.com/watch?v=DkFJE8ZdeG8",
+        "description": "Celebração épica da resistência, memória histórica e soberania dos povos latino-americanos."
+    },
 
-    post_columns = {col["name"] for col in inspector.get_columns("posts")}
-    if "author_id" not in post_columns:
-        with engine.begin() as conn:
-            conn.execute(text(
-                "ALTER TABLE posts ADD COLUMN author_id INTEGER REFERENCES users(id)"
+    # --- CENA CONTEMPORÂNEA & PROTESTO 2026 (AMÉRICA LATINA & MUNDO) ---
+    {
+        "title": "This Is Not America (feat. Ibeyi)",
+        "artist": "Residente",
+        "country": "Porto Rico / América Latina",
+        "genre": "Cena 2026 // Rap & Percussão Afro-Latina",
+        "youtube_id": "GK87AKIPyZY",
+        "youtube_url": "https://www.youtube.com/watch?v=GK87AKIPyZY",
+        "description": "Manifesto audiovisual contemporâneo reivindicando a identidade continental da América Latina contra o imperialismo."
+    },
+    {
+        "title": "Tierra Zanta",
+        "artist": "Trueno & Victor Heredia",
+        "country": "Argentina",
+        "genre": "Cena 2026 // Rap Sul-Americano & Folclore",
+        "youtube_id": "POAdMW-4yfw",
+        "youtube_url": "https://www.youtube.com/watch?v=POAdMW-4yfw",
+        "description": "Encontro da nova geração do rap argentino com a lenda da canção de protesto Victor Heredia em defesa da América do Sul."
+    },
+    {
+        "title": "Antipatriarca",
+        "artist": "Ana Tijoux",
+        "country": "Chile",
+        "genre": "Cena 2026 // Rap de Protesto Latino",
+        "youtube_id": "RoKoj8bFg2E",
+        "youtube_url": "https://www.youtube.com/watch?v=RoKoj8bFg2E",
+        "description": "Voz potente do hip-hop chileno contemporâneo contra a opressão, o autoritarismo e a violência estrutural."
+    },
+    {
+        "title": "Primavera (part. Rael & Giovani Cidreira)",
+        "artist": "Don L",
+        "country": "Brasil",
+        "genre": "Cena 2026 // Rap Político Brasileiro",
+        "youtube_id": "bs5B5VLhqlk",
+        "youtube_url": "https://www.youtube.com/watch?v=bs5B5VLhqlk",
+        "description": "Lirismo revolucionário da cena contemporânea brasileira conectando a luta histórica do Sul Global ao futuro."
+    },
+    {
+        "title": "Olho de Tigre (Fogo nos Racistas)",
+        "artist": "Djonga",
+        "country": "Brasil",
+        "genre": "Cena 2026 // Rap Nacional",
+        "youtube_id": "s5pPKgPS50w",
+        "youtube_url": "https://www.youtube.com/watch?v=s5pPKgPS50w",
+        "description": "Um dos maiores hinos de protesto antirracista da música brasileira contemporânea."
+    },
+    {
+        "title": "Lucro (Descomprimindo)",
+        "artist": "BaianaSystem",
+        "country": "Brasil",
+        "genre": "Cena 2026 // Afro-Rock & SoundSystem",
+        "youtube_id": "y7NJN0MFnTw",
+        "youtube_url": "https://www.youtube.com/watch?v=y7NJN0MFnTw",
+        "description": "Crítica feroz à especulação imobiliária e à máquina de lucro urbano ('Tire as construções da minha praia')."
+    },
+    {
+        "title": "AmarElo (Sample: Belchior)",
+        "artist": "Emicida (part. Majur & Pabllo Vittar)",
+        "country": "Brasil",
+        "genre": "Cena 2026 // Rap Consciente & MPB",
+        "youtube_id": "PTDgP3BDPIU",
+        "youtube_url": "https://www.youtube.com/watch?v=PTDgP3BDPIU",
+        "description": "Ponte entre o clássico de Belchior e a luta contemporânea por saúde mental, dignidade e resistência coletiva."
+    },
+    {
+        "title": "Não Existe Amor em SP",
+        "artist": "Criolo",
+        "country": "Brasil",
+        "genre": "Cena 2026 // Rap & MPB Contemporânea",
+        "youtube_id": "0PfevkndCPU",
+        "youtube_url": "https://www.youtube.com/watch?v=0PfevkndCPU",
+        "description": "Retrato poético e contundente sobre a frieza urbana, desigualdade e busca por humanidade nas metrópoles."
+    }
+]
+
+
+def _ensure_schema_migrations():
+    """Adds missing columns to existing SQLite tables (create_all won't ALTER)."""
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+
+    with engine.begin() as conn:
+        if "posts" in table_names:
+            post_columns = {col["name"] for col in inspector.get_columns("posts")}
+            if "author_id" not in post_columns:
+                conn.execute(text("ALTER TABLE posts ADD COLUMN author_id INTEGER REFERENCES users(id)"))
+                logger.info("[MIGRATE] Column posts.author_id added.")
+
+        if "users" in table_names:
+            user_columns = {col["name"] for col in inspector.get_columns("users")}
+            if "email" not in user_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR(150)"))
+                logger.info("[MIGRATE] Column users.email added.")
+            if "role" not in user_columns:
+                conn.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'"))
+                logger.info("[MIGRATE] Column users.role added.")
+
+        if "comments" in table_names:
+            comment_columns = {col["name"] for col in inspector.get_columns("comments")}
+            if "user_id" not in comment_columns:
+                conn.execute(text("ALTER TABLE comments ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+                logger.info("[MIGRATE] Column comments.user_id added.")
+            if "edit_token" not in comment_columns:
+                conn.execute(text("ALTER TABLE comments ADD COLUMN edit_token VARCHAR(64)"))
+                logger.info("[MIGRATE] Column comments.edit_token added.")
+            if "updated_at" not in comment_columns:
+                conn.execute(text("ALTER TABLE comments ADD COLUMN updated_at DATETIME"))
+                logger.info("[MIGRATE] Column comments.updated_at added.")
+
+        if "push_subscriptions" in table_names:
+            push_columns = {col["name"] for col in inspector.get_columns("push_subscriptions")}
+            if "user_id" not in push_columns:
+                conn.execute(text("ALTER TABLE push_subscriptions ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+                logger.info("[MIGRATE] Column push_subscriptions.user_id added.")
+
+
+def _sync_default_protest_tracks(db):
+    """Sincroniza e atualiza as faixas padrao da Radio Pirata (Classicos + 2026) garantindo IDs verificados."""
+    for item in DEFAULT_PROTEST_TRACKS:
+        existing = (
+            db.query(RadioTrack)
+            .filter(RadioTrack.title.ilike(f"%{item['title'][:18]}%"))
+            .first()
+        )
+        if existing:
+            existing.youtube_id = item["youtube_id"]
+            existing.youtube_url = item["youtube_url"]
+            existing.genre = item["genre"]
+            existing.country = item["country"]
+            existing.artist = item["artist"]
+            existing.description = item["description"]
+        else:
+            db.add(RadioTrack(
+                title=item["title"],
+                artist=item["artist"],
+                country=item["country"],
+                genre=item["genre"],
+                youtube_id=item["youtube_id"],
+                youtube_url=item["youtube_url"],
+                description=item["description"],
+                is_active=True,
+                created_at=datetime.now()
             ))
-        logger.info("[MIGRATE] Column posts.author_id added.")
+    db.commit()
 
 
 def init_database():
-    """Cria tabelas e popula com dados iniciais limpos (1 post rico e 1 projeto no Lab)."""
+    """Cria tabelas e popula com dados iniciais limpos (1 post rico, projetos no Lab e Rádio Pirata)."""
     Base.metadata.create_all(bind=engine)
     _ensure_schema_migrations()
     db = SessionLocal()
@@ -37,11 +289,15 @@ def init_database():
             admin_user = User(
                 username=settings.ADMIN_USERNAME,
                 password_hash=hash_password(settings.ADMIN_PASSWORD),
+                role="admin",
                 created_at=datetime.now()
             )
             db.add(admin_user)
             db.commit()
             logger.info(f"[SEED] Usuário admin '{settings.ADMIN_USERNAME}' configurado com sucesso.")
+        elif admin_user.role != "admin":
+            admin_user.role = "admin"
+            db.commit()
 
         # Rename legacy category labels to the new naming
         renamed = (
@@ -162,6 +418,9 @@ Puxe a respiração fundo. Desconecte o ruído. O verdadeiro duelo sempre foi co
             db.commit()
             logger.info("[SEED] Projeto 'simple64' inserido no Lab.")
 
+        # 6. Sincroniza Rádio Pirata by YouTube (Clássicos Históricos + Cena 2026)
+        _sync_default_protest_tracks(db)
+
     except Exception as e:
         db.rollback()
         logger.error(f"[SEED ERROR] Falha ao inicializar dados: {e}")
@@ -182,7 +441,8 @@ def reset_to_clean_state():
         else:
             db.add(SiteStat(key="total_visits", value=0))
 
-        # Limpa comentários e posts antigos
+        # Limpa comentários, notificações e posts antigos
+        db.query(Notification).delete()
         db.query(Comment).delete()
         db.query(Post).delete()
         db.query(CommunitySubmission).delete()

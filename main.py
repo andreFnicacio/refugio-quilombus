@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import uuid
 import math
 import html
@@ -34,7 +35,17 @@ from slowapi.errors import RateLimitExceeded
 
 from config import settings
 from database import get_db, SessionLocal, engine
-from models import User, Post, CommunitySubmission, Comment, SiteStat, PushSubscription, PushLog
+from models import (
+    User,
+    Post,
+    CommunitySubmission,
+    Comment,
+    SiteStat,
+    PushSubscription,
+    PushLog,
+    Notification,
+    RadioTrack
+)
 from schemas import PushSubscriptionCreate, PushUnsubscribeRequest, PushBroadcastRequest
 from push_service import (
     ensure_vapid_keys,
@@ -43,10 +54,12 @@ from push_service import (
     unregister_subscription,
     broadcast_notification,
     send_post_push_notification,
+    notify_new_comment,
     check_and_send_daily_news_digest
 )
 from auth import (
     require_admin,
+    require_login,
     get_current_user_optional,
     verify_password,
     hash_password,
@@ -62,11 +75,18 @@ from media_utils import (
     render_link_preview,
     process_media_links
 )
+from backup_service import (
+    DEFAULT_BACKUP_JSON_PATH,
+    export_backup_to_json,
+    import_backup_from_json,
+    git_commit_and_push_backup
+)
 
 
 # Rate Limiter em memória (FinOps: zero overhead de Redis para instâncias locais/leves)
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
+COMMENT_TOKENS_COOKIE = "refugio_comment_tokens"
 
 logger = logging.getLogger("refugio.main")
 
@@ -204,6 +224,60 @@ def clean_plain_text(text: str) -> str:
     return html.unescape(cleaned)
 
 
+def render_comment_content(text: str) -> str:
+    """
+    Renderiza o conteudo de comentarios com suporte seguro a hiperlinks:
+      - Converte links Markdown [Texto](https://...) em <a href="...">
+      - Converte URLs diretas (https://... ou http://...) em hiperlinks clicaveis
+      - Bloqueia rigorosamente XSS e protocolos maliciosos (javascript:, data:, vbscript:)
+    """
+    if not text:
+        return ""
+
+    # 1. Escapa todo o texto contra HTML/XSS
+    escaped = html.escape(text.strip())
+
+    placeholders: dict[str, str] = {}
+
+    def _store_anchor(href: str, label: str) -> str:
+        key = f"__LINK_PLACEHOLDER_{len(placeholders)}__"
+        placeholders[key] = (
+            f'<a href="{href}" target="_blank" rel="noopener noreferrer nofollow" '
+            f'class="comment-link">{label}</a>'
+        )
+        return key
+
+    # 2. Links no formato Markdown: [Texto](https://exemplo.com)
+    md_link_pattern = re.compile(r'\[([^\[\]\n]{1,120})\]\((https?:\/\/[^\s\)\"\'\<\>]+)\)', re.IGNORECASE)
+
+    def _replace_md_link(match: re.Match) -> str:
+        label = match.group(1)
+        url = match.group(2)
+        return _store_anchor(url, label)
+
+    processed = md_link_pattern.sub(_replace_md_link, escaped)
+
+    # 3. URLs diretas soltas no texto: https://... ou http://...
+    bare_url_pattern = re.compile(r'(https?:\/\/[^\s\"\'\<\>]+)', re.IGNORECASE)
+
+    def _replace_bare_url(match: re.Match) -> str:
+        raw_url = match.group(1)
+        trailing = ""
+        while raw_url and raw_url[-1] in ".,;:!?)":
+            trailing = raw_url[-1] + trailing
+            raw_url = raw_url[:-1]
+        if not raw_url or raw_url in ("http://", "https://"):
+            return match.group(0)
+        return _store_anchor(raw_url, raw_url) + trailing
+
+    processed = bare_url_pattern.sub(_replace_bare_url, processed)
+
+    for key, anchor_html in placeholders.items():
+        processed = processed.replace(key, anchor_html)
+
+    return processed
+
+
 # Configuração rígida de tags e atributos permitidos para sanitização contra XSS
 ALLOWED_TAGS = [
     "a", "abbr", "acronym", "b", "blockquote", "code", "em", "i", "li", "ol",
@@ -276,6 +350,7 @@ def format_odometer(value: int) -> list[str]:
 
 
 templates.env.filters["markdown"] = render_markdown
+templates.env.filters["render_comment"] = render_comment_content
 templates.env.filters["format_datetime"] = format_datetime
 templates.env.filters["format_odometer"] = format_odometer
 templates.env.filters["render_media"] = render_post_media
@@ -304,6 +379,42 @@ def increment_site_visits(db: Session) -> int:
         stat.value += 1
     db.commit()
     return stat.value
+
+
+def _get_comment_tokens_map(request: Request) -> dict[str, str]:
+    raw = request.cookies.get(COMMENT_TOKENS_COOKIE)
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+def can_user_edit_comment(
+    comment: Comment,
+    current_user: Optional[User],
+    token_map: dict[str, str],
+    explicit_token: Optional[str] = None
+) -> bool:
+    """Verifica se o usuario logado ou visitante atual tem permissao para editar o comentario."""
+    if current_user:
+        if getattr(current_user, "role", "user") == "admin":
+            return True
+        if comment.user_id and comment.user_id == current_user.id:
+            return True
+        if comment.user_id is None and comment.author_name.lower() == current_user.username.lower():
+            return True
+
+    if comment.edit_token:
+        if explicit_token and explicit_token == comment.edit_token:
+            return True
+        cookie_tok = token_map.get(str(comment.id))
+        if cookie_tok and cookie_tok == comment.edit_token:
+            return True
+
+    return False
 
 
 # --- ROTAS PÚBLICAS ---
@@ -348,7 +459,8 @@ def index(
             "current_category": category,
             "categories": categories,
             "total_visits": visits,
-            "current_user": current_user
+            "current_user": current_user,
+            "flash_message": request.query_params.get("msg")
         }
     )
 
@@ -381,6 +493,12 @@ def post_detail(
     post.views_count += 1
     db.commit()
 
+    token_map = _get_comment_tokens_map(request)
+    editable_comment_ids = {
+        c.id for c in post.comments
+        if can_user_edit_comment(c, current_user, token_map)
+    }
+
     return templates.TemplateResponse(
         request=request,
         name="post.html",
@@ -388,6 +506,7 @@ def post_detail(
             "post": post,
             "total_visits": visits,
             "current_user": current_user,
+            "editable_comment_ids": editable_comment_ids,
             "flash_message": request.query_params.get("msg")
         }
     )
@@ -398,9 +517,10 @@ def post_detail(
 def create_comment(
     request: Request,
     slug: str,
-    author_name: str = Form(...),
-    author_email: str = Form(...),
-    content: str = Form(...),
+    background_tasks: BackgroundTasks,
+    author_name: Optional[str] = Form(None),
+    author_email: Optional[str] = Form(None),
+    content: str = Form(""),
     notify_replies: Optional[bool] = Form(False),
     website_hp: Optional[str] = Form(None),  # Honeypot anti-spam
     db: Session = Depends(get_db)
@@ -413,30 +533,105 @@ def create_comment(
     if not post:
         raise HTTPException(status_code=404, detail="Post não encontrado")
 
-    author_name = clean_plain_text(author_name)
-    author_email = author_email.strip()
-    # Sanitiza conteúdo do comentário para evitar injeção de HTML
-    content = clean_plain_text(content)
+    current_user = get_current_user_optional(request, db)
 
-    if not author_name or not author_email or not content:
+    if current_user:
+        resolved_name = clean_plain_text(author_name) if author_name and author_name.strip() else current_user.username
+        resolved_email = (
+            author_email.strip()
+            if author_email and author_email.strip()
+            else (current_user.email or f"{current_user.username}@refugio.local")
+        )
+    else:
+        resolved_name = clean_plain_text(author_name or "")
+        resolved_email = (author_email or "").strip()
+
+    # Sanitiza conteúdo do comentário para evitar injeção de HTML bruto
+    cleaned_content = clean_plain_text(content)
+
+    if not resolved_name or not resolved_email or not cleaned_content:
         return RedirectResponse(
             url=f"/post/{slug}?msg=Campos+obrigatorios+nao+preenchidos#comment-box",
             status_code=status.HTTP_303_SEE_OTHER
         )
 
+    edit_token = uuid.uuid4().hex
     comment = Comment(
         post_id=post.id,
-        author_name=author_name,
-        author_email=author_email,
-        content=content,
-        notify_replies=False,
+        user_id=current_user.id if current_user else None,
+        author_name=resolved_name,
+        author_email=resolved_email,
+        content=cleaned_content,
+        notify_replies=bool(notify_replies),
+        edit_token=edit_token,
         created_at=datetime.now()
     )
     db.add(comment)
     db.commit()
+    db.refresh(comment)
+
+    # Dispara notificacoes In-App e Web Push em background
+    background_tasks.add_task(notify_new_comment, post.id, comment.id)
+
+    response = RedirectResponse(
+        url=f"/post/{slug}?msg=Comentario+publicado+com+sucesso#comment-{comment.id}",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+    token_map = _get_comment_tokens_map(request)
+    token_map[str(comment.id)] = edit_token
+    # Mantem apenas os ultimos 25 tokens no cookie para ser super leve
+    if len(token_map) > 25:
+        keys = list(token_map.keys())[-25:]
+        token_map = {k: token_map[k] for k in keys}
+    response.set_cookie(
+        key=COMMENT_TOKENS_COOKIE,
+        value=json.dumps(token_map),
+        httponly=True,
+        samesite="lax"
+    )
+    return response
+
+
+@app.post("/post/{slug}/comment/{comment_id}/edit")
+@limiter.limit("15/minute")
+def edit_comment(
+    request: Request,
+    slug: str,
+    comment_id: int,
+    content: str = Form(...),
+    edit_token: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    post = db.query(Post).filter(Post.slug == slug).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post não encontrado")
+
+    comment = db.query(Comment).filter(Comment.id == comment_id, Comment.post_id == post.id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comentário não encontrado")
+
+    current_user = get_current_user_optional(request, db)
+    token_map = _get_comment_tokens_map(request)
+
+    if not can_user_edit_comment(comment, current_user, token_map, explicit_token=edit_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não possui permissão para editar este comentário."
+        )
+
+    cleaned_content = clean_plain_text(content)
+    if not cleaned_content or len(cleaned_content) < 2:
+        return RedirectResponse(
+            url=f"/post/{slug}?msg=Conteudo+do+comentario+invalido#comment-{comment.id}",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    comment.content = cleaned_content
+    comment.updated_at = datetime.now()
+    db.commit()
 
     return RedirectResponse(
-        url=f"/post/{slug}?msg=Comentario+publicado+com+sucesso#comments",
+        url=f"/post/{slug}?msg=Comentario+atualizado+com+sucesso#comment-{comment.id}",
         status_code=status.HTTP_303_SEE_OTHER
     )
 
@@ -576,7 +771,75 @@ def about(request: Request, db: Session = Depends(get_db)):
     )
 
 
-# --- AUTENTICAÇÃO ---
+# --- RÁDIO PIRATA BY YOUTUBE (MÚSICAS DE PROTESTO) ---
+
+@app.get("/radio", response_class=HTMLResponse)
+def pirate_radio_page(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = get_current_user_optional(request, db)
+    visits = increment_site_visits(db)
+    tracks = (
+        db.query(RadioTrack)
+        .filter(RadioTrack.is_active == True)
+        .order_by(RadioTrack.id.asc())
+        .all()
+    )
+    tracks_json = [
+        {
+            "id": t.id,
+            "title": t.title,
+            "artist": t.artist,
+            "country": t.country,
+            "genre": t.genre,
+            "youtube_id": t.youtube_id,
+            "youtube_url": t.youtube_url,
+            "description": t.description or ""
+        }
+        for t in tracks
+    ]
+
+    return templates.TemplateResponse(
+        request=request,
+        name="radio.html",
+        context={
+            "tracks": tracks,
+            "tracks_json": json.dumps(tracks_json, ensure_ascii=False),
+            "total_visits": visits,
+            "current_user": current_user
+        }
+    )
+
+
+@app.get("/api/radio/playlist")
+def api_radio_playlist(db: Session = Depends(get_db)):
+    tracks = (
+        db.query(RadioTrack)
+        .filter(RadioTrack.is_active == True)
+        .order_by(RadioTrack.id.asc())
+        .all()
+    )
+    return {
+        "station": "Rádio Pirata // O Refúgio (Vozes de Protesto)",
+        "total": len(tracks),
+        "tracks": [
+            {
+                "id": t.id,
+                "title": t.title,
+                "artist": t.artist,
+                "country": t.country,
+                "genre": t.genre,
+                "youtube_id": t.youtube_id,
+                "youtube_url": t.youtube_url,
+                "description": t.description or ""
+            }
+            for t in tracks
+        ]
+    }
+
+
+# --- AUTENTICAÇÃO E CADASTRO DE USUÁRIOS ---
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(
@@ -587,7 +850,8 @@ def login_page(
 ):
     current_user = get_current_user_optional(request, db)
     if current_user:
-        return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+        dest = "/admin" if current_user.is_admin else "/diario"
+        return RedirectResponse(url=dest, status_code=status.HTTP_303_SEE_OTHER)
 
     visits = get_site_visits(db)
     return templates.TemplateResponse(
@@ -627,7 +891,10 @@ def login_post(
 
     # Cria sessão com cookie assinado efêmero (Session Cookie puro)
     token = create_session_token(user.username)
-    target = next if (next and next.startswith("/")) else "/admin"
+    target = next if (next and next.startswith("/")) else ("/admin" if user.is_admin else "/diario")
+    if not user.is_admin and target.startswith("/admin"):
+        target = "/diario"
+
     response = RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         key=settings.SESSION_COOKIE_NAME,
@@ -641,11 +908,260 @@ def login_post(
     return response
 
 
+@app.get("/register", response_class=HTMLResponse)
+def register_page(
+    request: Request,
+    next: Optional[str] = "/diario",
+    error: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    current_user = get_current_user_optional(request, db)
+    if current_user:
+        return RedirectResponse(url="/diario", status_code=status.HTTP_303_SEE_OTHER)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={
+            "next": next,
+            "error": error,
+            "total_visits": get_site_visits(db),
+            "current_user": None
+        }
+    )
+
+
+@app.post("/register")
+@limiter.limit("5/minute")
+def register_post(
+    request: Request,
+    username: str = Form(...),
+    email: Optional[str] = Form(None),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    next: Optional[str] = Form("/diario"),
+    website_hp: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    if website_hp:
+        return RedirectResponse(url="/diario", status_code=status.HTTP_303_SEE_OTHER)
+
+    clean_username = clean_plain_text(username).strip()
+    clean_email = email.strip().lower() if email and email.strip() else None
+    visits = get_site_visits(db)
+
+    if not clean_username or len(clean_username) < 3 or len(clean_username) > 30:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "next": next,
+                "error": "Nome de usuário inválido (deve ter entre 3 e 30 caracteres).",
+                "total_visits": visits,
+                "current_user": None
+            },
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not re.match(r"^[a-zA-Z0-9_-]+$", clean_username):
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "next": next,
+                "error": "Use apenas letras, números, hífen (-) ou underline (_).",
+                "total_visits": visits,
+                "current_user": None
+            },
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+
+    if len(password) < 6:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "next": next,
+                "error": "A senha deve possuir no mínimo 6 caracteres.",
+                "total_visits": visits,
+                "current_user": None
+            },
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+
+    if password != confirm_password:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "next": next,
+                "error": "As senhas informadas não conferem.",
+                "total_visits": visits,
+                "current_user": None
+            },
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+
+    existing = db.query(User).filter(User.username == clean_username).first()
+    if existing:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "next": next,
+                "error": f"O identificador '{clean_username}' já está em uso.",
+                "total_visits": visits,
+                "current_user": None
+            },
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
+
+    if clean_email:
+        existing_email = db.query(User).filter(User.email == clean_email).first()
+        if existing_email:
+            return templates.TemplateResponse(
+                request=request,
+                name="register.html",
+                context={
+                    "next": next,
+                    "error": "Este endereço de e-mail já está vinculado a outra conta.",
+                    "total_visits": visits,
+                    "current_user": None
+                },
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+    new_user = User(
+        username=clean_username,
+        email=clean_email,
+        password_hash=hash_password(password),
+        role="user",
+        created_at=datetime.now()
+    )
+    db.add(new_user)
+    db.commit()
+
+    token = create_session_token(new_user.username)
+    target = next if (next and next.startswith("/") and not next.startswith("/admin")) else "/diario"
+    response = RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
+    response.set_cookie(
+        key=settings.SESSION_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        max_age=None,
+        expires=None,
+        samesite="lax",
+        secure=False
+    )
+    return response
+
+
 @app.get("/logout")
 def logout():
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     response.delete_cookie(key=settings.SESSION_COOKIE_NAME)
     return response
+
+
+# --- CENTRAL DE ALERTAS IN-APP (NOTIFICAÇÕES DE USUÁRIOS & FÓRUNS) ---
+
+@app.get("/notifications", response_class=HTMLResponse)
+def user_notifications_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_login)
+):
+    visits = get_site_visits(db)
+    notifications = (
+        db.query(Notification)
+        .filter(Notification.user_id == current_user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    unread_count = sum(1 for n in notifications if not n.is_read)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="notifications.html",
+        context={
+            "notifications": notifications,
+            "unread_count": unread_count,
+            "total_visits": visits,
+            "current_user": current_user,
+            "flash_message": request.query_params.get("msg")
+        }
+    )
+
+
+@app.post("/notifications/{notif_id}/read")
+def mark_notification_read(
+    notif_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_login)
+):
+    notif = (
+        db.query(Notification)
+        .filter(Notification.id == notif_id, Notification.user_id == current_user.id)
+        .first()
+    )
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notificação não encontrada")
+
+    notif.is_read = True
+    db.commit()
+
+    target = notif.target_url if notif.target_url.startswith("/") else "/notifications"
+    return RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.post("/notifications/read-all")
+def mark_all_notifications_read(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_login)
+):
+    (
+        db.query(Notification)
+        .filter(Notification.user_id == current_user.id, Notification.is_read == False)
+        .update({"is_read": True}, synchronize_session=False)
+    )
+    db.commit()
+    return RedirectResponse(
+        url="/notifications?msg=Todos+os+alertas+foram+marcados+como+lidos.",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@app.get("/api/notifications/unread")
+def api_unread_notifications(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = get_current_user_optional(request, db)
+    if not current_user:
+        return {"authenticated": False, "unread_count": 0, "items": []}
+
+    unread_items = (
+        db.query(Notification)
+        .filter(Notification.user_id == current_user.id, Notification.is_read == False)
+        .order_by(Notification.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    return {
+        "authenticated": True,
+        "unread_count": getattr(current_user, "unread_notifications_count", len(unread_items)),
+        "items": [
+            {
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "target_url": n.target_url,
+                "created_at": format_datetime(n.created_at)
+            }
+            for n in unread_items
+        ]
+    }
 
 
 # --- ÁREA ADMINISTRATIVA PROTEGIDA ---
@@ -696,13 +1212,26 @@ def admin_dashboard(
         .all()
     )
     recent_comments = db.query(Comment).order_by(Comment.created_at.desc()).limit(30).all()
-    operators = db.query(User).order_by(User.created_at.asc()).all()
+    operators = db.query(User).filter(User.role == "admin").order_by(User.created_at.asc()).all()
+    community_users = db.query(User).filter(User.role == "user").order_by(User.created_at.desc()).all()
+    radio_tracks = db.query(RadioTrack).order_by(RadioTrack.id.asc()).all()
 
     push_subscribers_count = db.query(PushSubscription).count()
     push_logs = db.query(PushLog).order_by(PushLog.sent_at.desc()).limit(15).all()
 
     # Categorias consolidadas para o dropdown de criação de posts
     available_categories = get_available_post_categories(db)
+
+    # Informações do snapshot de backup JSON
+    backup_exists = os.path.exists(DEFAULT_BACKUP_JSON_PATH)
+    backup_meta = None
+    if backup_exists:
+        try:
+            with open(DEFAULT_BACKUP_JSON_PATH, "r", encoding="utf-8") as bf:
+                b_data = json.load(bf)
+                backup_meta = b_data.get("metadata", {})
+        except Exception:
+            backup_meta = None
 
     # Métricas gerais
     stats = {
@@ -712,7 +1241,8 @@ def admin_dashboard(
         "approved_submissions": len(approved_submissions),
         "total_comments": db.query(Comment).count(),
         "total_visits": visits,
-        "push_subscribers": push_subscribers_count
+        "push_subscribers": push_subscribers_count,
+        "radio_tracks": len(radio_tracks)
     }
 
     return templates.TemplateResponse(
@@ -728,6 +1258,10 @@ def admin_dashboard(
             "rejected_submissions": rejected_submissions,
             "comments": recent_comments,
             "operators": operators,
+            "community_users": community_users,
+            "radio_tracks": radio_tracks,
+            "backup_exists": backup_exists,
+            "backup_meta": backup_meta,
             "stats": stats,
             "active_tab": tab,
             "total_visits": visits,
@@ -801,7 +1335,7 @@ async def admin_create_post(
     db.commit()
 
     # Disparo assincrono em segundo plano para inscritos no Web Push
-    background_tasks.add_task(send_post_push_notification, post)
+    background_tasks.add_task(send_post_push_notification, post.id)
 
     return RedirectResponse(
         url="/admin?tab=posts&msg=Post+publicado+com+sucesso",
@@ -992,6 +1526,7 @@ def admin_create_operator(
     new_operator = User(
         username=clean_username,
         password_hash=hash_password(password),
+        role="admin",
         created_at=datetime.now()
     )
     db.add(new_operator)
@@ -1015,7 +1550,7 @@ def admin_delete_operator(
             status_code=status.HTTP_303_SEE_OTHER
         )
 
-    total_operators = db.query(User).count()
+    total_operators = db.query(User).filter(User.role == "admin").count()
     if total_operators <= 1:
         return RedirectResponse(
             url="/admin?tab=operators&msg=Acao+bloqueada:+o+sistema+precisa+manter+ao+menos+um+operador+ativo.",
@@ -1036,6 +1571,156 @@ def admin_delete_operator(
         url="/admin?tab=operators&msg=Operador+nao+encontrado.",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+
+# --- ROTAS ADMIN: RÁDIO PIRATA ---
+
+@app.post("/admin/radio/new")
+def admin_add_radio_track(
+    title: str = Form(...),
+    artist: str = Form(...),
+    country: str = Form("América Latina"),
+    genre: str = Form("Protesto"),
+    youtube_url: str = Form(...),
+    description: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    clean_title = clean_plain_text(title)
+    clean_artist = clean_plain_text(artist)
+    clean_country = clean_plain_text(country) or "América Latina"
+    clean_genre = clean_plain_text(genre) or "Protesto"
+    clean_desc = clean_plain_text(description or "")
+
+    yt_id = extract_youtube_id(youtube_url)
+    if not yt_id and re.match(r"^[a-zA-Z0-9_-]{11}$", youtube_url.strip()):
+        yt_id = youtube_url.strip()
+
+    if not yt_id:
+        return RedirectResponse(
+            url="/admin?tab=radio&msg=Link+do+YouTube+invalido.+Informe+uma+URL+valida+do+YouTube.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+
+    track = RadioTrack(
+        title=clean_title,
+        artist=clean_artist,
+        country=clean_country,
+        genre=clean_genre,
+        youtube_id=yt_id,
+        youtube_url=f"https://www.youtube.com/watch?v={yt_id}",
+        description=clean_desc,
+        is_active=True,
+        created_at=datetime.now()
+    )
+    db.add(track)
+    db.commit()
+
+    return RedirectResponse(
+        url="/admin?tab=radio&msg=Faixa+adicionada+na+Radio+Pirata+com+sucesso!",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@app.post("/admin/radio/{track_id}/toggle")
+def admin_toggle_radio_track(
+    track_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    track = db.query(RadioTrack).filter(RadioTrack.id == track_id).first()
+    if track:
+        track.is_active = not track.is_active
+        db.commit()
+    return RedirectResponse(
+        url="/admin?tab=radio&msg=Status+da+faixa+atualizado.",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@app.post("/admin/radio/{track_id}/delete")
+def admin_delete_radio_track(
+    track_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    track = db.query(RadioTrack).filter(RadioTrack.id == track_id).first()
+    if track:
+        db.delete(track)
+        db.commit()
+    return RedirectResponse(
+        url="/admin?tab=radio&msg=Faixa+removida+da+Radio+Pirata.",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+# --- ROTAS ADMIN: BACKUP JSON & GIT PUSH ---
+
+@app.post("/admin/backup/export")
+def admin_backup_export(
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    payload = export_backup_to_json(db=db)
+    counts = payload["metadata"]["counts"]
+    return RedirectResponse(
+        url=f"/admin?tab=backup&msg=Snapshot+JSON+gerado+com+sucesso+({counts['posts']}+posts,+{counts['comments']}+comentarios).",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@app.get("/admin/backup/download")
+def admin_backup_download(
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    export_backup_to_json(db=db, output_path=DEFAULT_BACKUP_JSON_PATH)
+    return FileResponse(
+        DEFAULT_BACKUP_JSON_PATH,
+        media_type="application/json",
+        filename="refugio_snapshot.json"
+    )
+
+
+@app.post("/admin/backup/git-push")
+def admin_backup_git_push(
+    admin_user: User = Depends(require_admin)
+):
+    res = git_commit_and_push_backup()
+    msg = res.get("message", "Operacao concluida.").replace(" ", "+")
+    return RedirectResponse(
+        url=f"/admin?tab=backup&msg={msg}",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@app.post("/admin/backup/restore")
+async def admin_backup_restore(
+    backup_file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin)
+):
+    try:
+        if backup_file and backup_file.filename:
+            raw_bytes = await backup_file.read()
+            payload = json.loads(raw_bytes.decode("utf-8"))
+            restored = import_backup_from_json(payload, db=db)
+        elif os.path.exists(DEFAULT_BACKUP_JSON_PATH):
+            restored = import_backup_from_json(DEFAULT_BACKUP_JSON_PATH, db=db)
+        else:
+            return RedirectResponse(
+                url="/admin?tab=backup&msg=Nenhum+arquivo+de+backup+encontrado+para+restaurar.",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
+        return RedirectResponse(
+            url=f"/admin?tab=backup&msg=Backup+restaurado+com+sucesso!+({restored['posts']}+posts+verificados).",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
+    except Exception as e:
+        return RedirectResponse(
+            url=f"/admin?tab=backup&msg=Erro+ao+restaurar+backup:+{str(e)[:80]}",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
 
 
 # --- HUB DINÂMICO DE NOTÍCIAS (RADAR) ---
@@ -1097,16 +1782,19 @@ def get_push_vapid_key():
 
 @app.post("/api/push/subscribe")
 def api_push_subscribe(
+    request: Request,
     payload: PushSubscriptionCreate,
     db: Session = Depends(get_db)
 ):
     """Registra ou atualiza a assinatura de notificacoes do leitor."""
+    current_user = get_current_user_optional(request, db)
     sub = register_subscription(
         db=db,
         endpoint=payload.endpoint,
         p256dh=payload.p256dh,
         auth=payload.auth,
-        user_agent=payload.user_agent
+        user_agent=payload.user_agent,
+        user_id=current_user.id if current_user else None
     )
     return {"status": "ok", "id": sub.id}
 
@@ -1162,4 +1850,3 @@ async def admin_push_digest_now(
         url="/admin?tab=push&msg=Resumo+do+Radar+disparado+com+sucesso+para+os+inscritos.",
         status_code=status.HTTP_303_SEE_OTHER
     )
-

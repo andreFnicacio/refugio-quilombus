@@ -8,7 +8,7 @@ from fastapi import Request, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User
+from models import User, Notification
 from config import settings
 
 serializer = URLSafeTimedSerializer(settings.SECRET_KEY, salt="refugio-session-salt")
@@ -36,8 +36,8 @@ def create_session_token(username: str) -> str:
     return serializer.dumps({"sub": username})
 
 
-def verify_session_token(token: str, max_age: int = 60 * 60 * 2) -> Optional[str]:
-    """Valida token assinado com tempo máximo de inatividade (padrão 2 horas)."""
+def verify_session_token(token: str, max_age: int = 60 * 60 * 8) -> Optional[str]:
+    """Valida token assinado com tempo máximo de inatividade."""
     try:
         data = serializer.loads(token, max_age=max_age)
         return data.get("sub")
@@ -58,6 +58,35 @@ def get_current_user_optional(
         return None
 
     user = db.query(User).filter(User.username == username).first()
+    if user:
+        try:
+            unread_count = (
+                db.query(Notification)
+                .filter(Notification.user_id == user.id, Notification.is_read == False)
+                .count()
+            )
+            setattr(user, "unread_notifications_count", unread_count)
+        except Exception:
+            setattr(user, "unread_notifications_count", 0)
+    return user
+
+
+def require_login(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> User:
+    user = get_current_user_optional(request, db)
+    if not user:
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept:
+            raise HTTPException(
+                status_code=status.HTTP_303_SEE_OTHER,
+                headers={"Location": f"/login?next={request.url.path}"}
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autenticação necessária"
+        )
     return user
 
 
@@ -76,6 +105,11 @@ def require_admin(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Autenticação necessária"
+        )
+    if getattr(user, "role", "admin") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a operadores do terminal."
         )
     return user
 

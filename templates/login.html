@@ -10,10 +10,10 @@
           [//R]
         </span>
         <h2 style="font-family: var(--font-mono); font-size: 1.2rem; color: #ffffff;">
-          [AUTENTICAÇÃO DO OPERADOR]
+          [AUTENTICAÇÃO NO TERMINAL]
         </h2>
         <p style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">
-          Área restrita de comando e controle do monólito.
+          Acesso para Membros da Comunidade e Operadores do Monólito.
         </p>
       </div>
 
@@ -28,7 +28,7 @@
 
         <div class="form-group">
           <label class="form-label" for="username">&gt; IDENTIFICADOR (USUÁRIO)</label>
-          <input type="text" id="username" name="username" class="form-input" placeholder="admin" required autofocus>
+          <input type="text" id="username" name="username" class="form-input" placeholder="seu_codinome" required autofocus>
         </div>
 
         <div class="form-group">
@@ -42,9 +42,17 @@
       </form>
 
       <div style="margin-top: 25px; border-top: 1px dashed #334155; padding-top: 15px; text-align: center;">
-        <small style="font-family: var(--font-mono); color: var(--text-dim); font-size: 0.75rem;">
-          Ambiente protegido por cookies de sessão HTTP-Only assinados.
-        </small>
+        <p style="font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px;">
+          Ainda não possui identidade no Refúgio?
+        </p>
+        <a href="/register?next={{ next or '/diario' }}" class="btn btn-cyan" style="padding: 6px 14px; font-size: 0.78rem;">
+          [+ CRIAR CONTA DE MEMBRO]
+        </a>
+        <div style="margin-top: 12px;">
+          <small style="font-family: var(--font-mono); color: var(--text-dim); font-size: 0.72rem;">
+            Ambiente protegido por cookies de sessão HTTP-Only assinados.
+          </small>
+        </div>
       </div>
     </div>
   </div>
