@@ -1,9 +1,38 @@
+import atexit
+import os
+import shutil
+import sqlite3
+import tempfile
+from unittest.mock import patch
 import pytest
+
+# Isola o banco de dados de testes para nunca poluir ou remover registros do blog.db real
+_TEST_TMP_DIR = tempfile.mkdtemp(prefix="refugio_pytest_")
+_TEST_DB_PATH = os.path.join(_TEST_TMP_DIR, "test_blog.db")
+if os.path.exists("blog.db"):
+    try:
+        _src = sqlite3.connect("blog.db")
+        _dst = sqlite3.connect(_TEST_DB_PATH)
+        _src.backup(_dst)
+        _dst.close()
+        _src.close()
+    except Exception:
+        shutil.copy2("blog.db", _TEST_DB_PATH)
+os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH}"
+atexit.register(lambda: shutil.rmtree(_TEST_TMP_DIR, ignore_errors=True))
+
 from fastapi.testclient import TestClient
 from main import app
 from database import SessionLocal
 from models import User, Post, CommunitySubmission, Comment, SiteStat, Notification, RadioTrack
 from config import settings
+
+
+@pytest.fixture(autouse=True)
+def _mock_external_webpush():
+    """Evita disparos HTTP reais para servidores FCM/Mozilla durante a suíte de testes."""
+    with patch("pywebpush.webpush", return_value=None):
+        yield
 
 
 @pytest.fixture(scope="module")
@@ -1037,10 +1066,11 @@ def test_backup_json_export_import_and_git_sync(client, tmp_path):
     restored = import_backup_from_json(temp_json)
     assert restored["posts"] >= 1
 
-    # Testa rota de download do admin
+    # Testa rota de download do admin (usando caminho temporario para nao sujar o git worktree)
     token = create_session_token(settings.ADMIN_USERNAME)
     cookies = {settings.SESSION_COOKIE_NAME: token}
-    dl_res = client.get("/admin/backup/download", cookies=cookies)
+    with patch("main.DEFAULT_BACKUP_JSON_PATH", temp_json):
+        dl_res = client.get("/admin/backup/download", cookies=cookies)
     assert dl_res.status_code == 200
     assert dl_res.json()["metadata"]["app"] == "O Refúgio"
 
